@@ -426,7 +426,7 @@ class Fit3Peak:
         
 #### Functions for running through all the 'images' - single peak case ####
 
-def run_thru_images(filePrefix, firstFile, lastFile, peak_bounds_init, peak_labels_init, caking_type, step=1, cake=1):
+def run_thru_images(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, peak_labels_init, caking_type, step=1, cake=1):
     
     """  Run through all 'images of the caked data and create a FitCake class object for each.
          Return a dictionary called fits contains keys (with the image name/number) and a FitCake class object for each. 
@@ -450,13 +450,13 @@ def run_thru_images(filePrefix, firstFile, lastFile, peak_bounds_init, peak_labe
         
         if caking_type=='normal':
             
-            dirname='Data/'+filePrefix + '_ascii/'
+            #dirname='Data/'+filePrefix + '_ascii/'
             fnumber='_{:05d}'.format(image_number)
             fname=filePrefix + fnumber+'.dat'
         
         if caking_type=='bottom' or caking_type=='top' or caking_type=='vertical' or caking_type=='horizontal':
             
-            dirname='Data/'+filePrefix + '_ascii/Merge/'
+            #dirname='Data/'+filePrefix + '_ascii/Merge/'
             fnumber='_{:05d}'.format(image_number)
             fname=filePrefix+'_MergeCakePoints_'+caking_type+fnumber+'.dat'
         
@@ -481,7 +481,7 @@ def run_thru_images(filePrefix, firstFile, lastFile, peak_bounds_init, peak_labe
 
 #### Functions for running through all the 'images' - multiple peak case (passing on initial parameters) ####
 
-def run_thru_images_initParams(filePrefix, firstFile, lastFile, peak_bounds_init, peak_labels_init, caking_type, peak_number, pv_1_cent=0, pv_1_min=0, pv_1_max=0, pv_2_cent=0, pv_2_min=0, pv_2_max=0, pv_3_cent=0, pv_3_min=0, pv_3_max=0, step=1, cake=1):
+def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, peak_labels_init, caking_type, peak_number, pv_1_cent=0, pv_1_min=0, pv_1_max=0, pv_2_cent=0, pv_2_min=0, pv_2_max=0, pv_3_cent=0, pv_3_min=0, pv_3_max=0, step=1, cake=1):
     
     """  Run through all 'images of the caked data and create a FitCake class object for each.
          Passes on initial parameters to help fit multiple peaks.
@@ -508,13 +508,13 @@ def run_thru_images_initParams(filePrefix, firstFile, lastFile, peak_bounds_init
         
         if caking_type=='normal':
             
-            dirname='Data/'+filePrefix + '_ascii/'
+            #dirname='Data/'+filePrefix + '_ascii/'
             fnumber='_{:05d}'.format(firstFile)
             fname=filePrefix + fnumber+'.dat'
         
         if caking_type=='bottom' or caking_type=='top' or caking_type=='vertical' or caking_type=='horizontal':
             
-            dirname='Data/'+filePrefix + '_ascii/Merge/'
+            #dirname='Data/'+filePrefix + '_ascii/Merge/'
             fnumber='_{:05d}'.format(firstFile)
             fname=filePrefix+'_MergeCakePoints_'+caking_type+fnumber+'.dat'
         
@@ -556,14 +556,14 @@ def run_thru_images_initParams(filePrefix, firstFile, lastFile, peak_bounds_init
         
         if caking_type=='normal':
             
-            dirname='Data/'+filePrefix + '_ascii/'
+            #dirname='Data/'+filePrefix + '_ascii/'
             fnumber='_{:05d}'.format(image_number)
             fnumber_previous='_{:05d}'.format(image_number-1)
             fname=filePrefix + fnumber+'.dat'
             
         if caking_type=='bottom' or caking_type=='top' or caking_type=='vertical' or caking_type=='horizontal':
             
-            dirname='Data/'+filePrefix + '_ascii/Merge/'
+            #dirname='Data/'+filePrefix + '_ascii/Merge/'
             fnumber='_{:05d}'.format(image_number)
             fnumber_previous='_{:05d}'.format(image_number-1)
             fname=filePrefix+'_MergeCakePoints_'+caking_type+fnumber+'.dat'
@@ -624,7 +624,7 @@ def plot_fit_saved_data(ref,line,data):
     
 #### Function to create merged cake files for increasing intensity ####
 
-def merge_peak_intensity(filePrefix, firstFile, lastFile, caking_type, step=1):
+def merge_peak_intensity(filePrefix, dataFolder, fileNameExtension, fileType, firstFile, lastFile, caking_type, step=1):
     
     """  Create a file merging the peak intensities of the given cakes, increasing peak intensity.
         Options for cakes are 'bottom, 'top', 'vertical', 'horizontal'.
@@ -632,9 +632,9 @@ def merge_peak_intensity(filePrefix, firstFile, lastFile, caking_type, step=1):
         """
     for image_number in range(firstFile,lastFile+1,step):
     
-        dirname='Data/'+filePrefix + '_ascii/'
+        dirname=dataFolder+filePrefix + fileNameExtension
         fnumber='_{:05d}'.format(image_number)
-        fname=filePrefix + fnumber+'.dat'
+        fname=filePrefix + fnumber+fileType
         path=dirname+fname
 
         if caking_type=='bottom':
@@ -674,7 +674,7 @@ def merge_peak_intensity(filePrefix, firstFile, lastFile, caking_type, step=1):
         #merge=np.stack([ttheta,sum_cake_intensity],axis=1)
 
         newfilePrefix=filePrefix+"_MergeCakeIntensity_"+caking_type
-        newfname=newfilePrefix + fnumber+'.dat'
+        newfname=newfilePrefix + fnumber+fileType
         newpath=dirname+'Merge/'+newfname
 
         os.makedirs(os.path.dirname(newpath), exist_ok=True)
@@ -682,16 +682,16 @@ def merge_peak_intensity(filePrefix, firstFile, lastFile, caking_type, step=1):
         
 #### Function to create merged cake files for greater no. of points ####
         
-def merge_peak_points(filePrefix, firstFile, lastFile, caking_type, step=1):
+def merge_peak_points(filePrefix, dataFolder, fileNameExtension, fileType, firstFile, lastFile, caking_type, step=1):
     
     """  Create a file merging the given cakes, giving a greater number of points at each 2-theta value.
         Options for cakes are 'bottom, 'top', 'vertical', 'horizontal'.
         """
     for image_number in range(firstFile,lastFile+1,step):
 
-        dirname='Data/'+filePrefix + '_ascii/'
+        dirname=dataFolder+filePrefix + fileNameExtension
         fnumber='_{:05d}'.format(image_number)
-        fname=filePrefix + fnumber+'.dat'
+        fname=filePrefix + fnumber+fileType
         path=dirname+fname
 
         if caking_type=='bottom':
@@ -743,7 +743,7 @@ def merge_peak_points(filePrefix, firstFile, lastFile, caking_type, step=1):
     
     
         newfilePrefix=filePrefix+"_MergeCakePoints_"+ caking_type
-        newfname=newfilePrefix + fnumber+'.dat'
+        newfname=newfilePrefix + fnumber+fileType
         newpath=dirname+'Merge/'+newfname
 
         os.makedirs(os.path.dirname(newpath), exist_ok=True)
