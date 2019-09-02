@@ -1,93 +1,84 @@
-import sys
-sys.path.append("/mnt/iusers01/jf01/mbcx9cd4/.local/lib/python3.6/site-packages")
-#add the right path to look for the packages (incl. lmfit)
-
 import numpy as np
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
 from lmfit import Model
-from lmfit.parameter import Parameters
-from ipywidgets import FloatProgress
-from IPython.display import display
-from scipy.signal import medfilt
 import time
 import os
-import pickle
 
-#### Functions for calculating d-spacing and strain ####
+
+# Functions for calculating d-spacing and strain
 
 def calc_dspacing(ttheta):
     """ Calculate d-spacing from two-theta values.
     """ 
-    xRayEnergy = 89.07 #in keV
+    x_ray_energy = 89.07 # in keV
     c = 2.99792458e8
     h = 6.62607004e-34
     e = 1.6021766208e-19
-    xRayWavelength = (h * c) / (xRayEnergy * 1e3 * e)
+    x_ray_wavelength = (h * c) / (x_ray_energy * 1e3 * e)
     
-    return xRayWavelength / (2 * np.sin(np.array(ttheta) * np.pi / 360))
+    return x_ray_wavelength / (2 * np.sin(np.array(ttheta) * np.pi / 360))
+
 
 def calc_strain(ttheta):
     """ Calculate strain from two-theta values. Applies average of first 200 points to define zero two-theta.
     """ 
-    theta=0.5*(np.array(ttheta))*np.pi/180.0
-    theta0=np.mean(theta[0:200])
-    strain =-(theta-theta0)/np.tan(theta)
-    #strain =-(theta-theta[0])/np.tan(theta)
+    theta = 0.5 * (np.array(ttheta)) * np.pi / 180.0
+    theta0 = np.mean(theta[0:200])
+    strain = -(theta-theta0)/np.tan(theta)
     return strain
+
 
 def calc_strain_singlepoint(ttheta):
     """ Calculate strain from two-theta values. First two-theta values is defined as zero two-theta.
-    """ 
-    theta=0.5*(np.array(ttheta))*np.pi/180.0
-    theta0=theta[0]
-    strain =-(theta-theta0)/np.tan(theta)
-    #strain =-(theta-theta[0])/np.tan(theta)
+    """
+    theta = 0.5 * (np.array(ttheta)) * np.pi / 180.0
+    theta0 = theta[0]
+    strain = -(theta - theta0) / np.tan(theta)
     return strain
+
 
 def relative_amplitude(amp):
     """ Calculate difference in amplitude from first measurement.
-    """ 
-    amp0=amp[2]
-    rel_amp =np.array(amp)/amp0
+    """
+    amp0 = amp[2]
+    rel_amp = np.array(amp) / amp0
     return rel_amp
 
-#### Functions for loading up data and fitting ####
 
-def get_cake(dirname, fname, cake=1):
-    
+# Functions for loading up data and fitting
+def get_cake(dirname, file_name, cake=1):
     """ Return 'spectrum' containing 2-theta increments and intensity values for a given cake.
         Note, assumed DAWN output data has 2-theta in column 0 and intensity of first cake in column 1.
-    """ 
-    file_name = dirname + fname
-    spectrum = np.loadtxt(file_name, usecols= (0,cake))
+    """
+    file_name = dirname + file_name
+    spectrum = np.loadtxt(file_name, usecols=(0, cake))
     return spectrum
               
 
 def get_peak(spectrum, ttheta_lims=(0, 10)):
-    
     """ Return intensity values within a given 2-theta range for an individual lattice plane peak.
         Note, output 'peak' includes 2-theta increments in column 0 and intensity in column 1.
     """
     ttheta = spectrum[:, 0]
-    #return array of 2-theta values within the limits by setting true/false statements.
-    ttheta_range = np.where(np.logical_and(
-                    ttheta > ttheta_lims[0], ttheta < ttheta_lims[1]))[0]
-    peak = spectrum[int(ttheta_range[0]):int(ttheta_range[-1]),:]
+    # return array of 2-theta values within the limits by setting true/false statements.
+    ttheta_range = np.where(np.logical_and(ttheta > ttheta_lims[0], ttheta < ttheta_lims[1]))[0]
+    peak = spectrum[int(ttheta_range[0]):int(ttheta_range[-1]), :]
     return peak
+
 
 def line(x, constBG):
         "constant Background"
         return constBG
 
+
 def fit_peak(peak_data, initParams=None):
-    
     """ Pseudo-Voigt fit to the lattice plane peak intensity.
         Return results of the fit as an lmfit class, which contains the fitted parameters (amplitude, fwhm, etc.) 
         and the fit line calculated using the fit parameters and 100x two-theta points.
-    """    
-    ttheta=peak_data[:,0]
-    intensity=peak_data[:,1]
+    """
+    ttheta = peak_data[:, 0]
+    intensity = peak_data[:, 1]
     pvModel = PseudoVoigtModel()
     model = pvModel + Model(line)
     if initParams is None:
@@ -98,24 +89,24 @@ def fit_peak(peak_data, initParams=None):
     else:
         pars = initParams
     fit_results = model.fit(intensity, pars, x=ttheta)
-    fit_ttheta=np.linspace(ttheta[0],ttheta[-1],100)
-    fit_line = [fit_ttheta,model.eval(fit_results.params,x=fit_ttheta)]
+    fit_ttheta = np.linspace(ttheta[0], ttheta[-1], 100)
+    fit_line = [fit_ttheta, model.eval(fit_results.params, x=fit_ttheta)]
     return fit_results, fit_line
 
-#### Functions for fitting two and three peaks ####
 
+# Functions for fitting two and three peaks
 def fit_two_peaks(peak_data, pv_1_cent=6.45, pv_1_min=6.37, pv_1_max=6.47, pv_2_cent=6.54, pv_2_min=6.46, pv_2_max=6.56, initParams=None):
     
     """ Pseudo-Voigt fit to the lattice plane peak intensity for two peaks (adjust function to include more).
         Parameters for each peak also require limits and centres to be set in the case of overlapping peaks.
         Return results of the fit as an lmfit class, which contains the fitted parameters (amplitude, fwhm, etc.) 
         and the fit line calculated using the fit parameters and 100x two-theta points.
-    """    
-    ttheta=peak_data[:,0]
-    intensity=peak_data[:,1]
-    
-    PV_1=PseudoVoigtModel(prefix='pv_1')
-    PV_2=PseudoVoigtModel(prefix='pv_2')
+    """
+    ttheta = peak_data[:, 0]
+    intensity = peak_data[:, 1]
+
+    PV_1 = PseudoVoigtModel(prefix='pv_1')
+    PV_2 = PseudoVoigtModel(prefix='pv_2')
 
     model = PV_1 + PV_2 + Model(line)
     
@@ -149,13 +140,13 @@ def fit_three_peaks(peak_data, pv_1_cent=3.43, pv_1_min=3.36, pv_1_max=3.44, pv_
         Parameters for each peak also require limits and centres to be set in the case of overlapping peaks.
         Return results of the fit as an lmfit class, which contains the fitted parameters (amplitude, fwhm, etc.) 
         and the fit line calculated using the fit parameters and 100x two-theta points.
-    """    
-    ttheta=peak_data[:,0]
-    intensity=peak_data[:,1]
-    
-    PV_1=PseudoVoigtModel(prefix='pv_1')
-    PV_2=PseudoVoigtModel(prefix='pv_2')
-    PV_3=PseudoVoigtModel(prefix='pv_3')
+    """
+    ttheta = peak_data[:, 0]
+    intensity = peak_data[:, 1]
+
+    PV_1 = PseudoVoigtModel(prefix='pv_1')
+    PV_2 = PseudoVoigtModel(prefix='pv_2')
+    PV_3 = PseudoVoigtModel(prefix='pv_3')
 
     model = PV_1 + PV_2 + PV_3 + Model(line)
     
@@ -177,49 +168,47 @@ def fit_three_peaks(peak_data, pv_1_cent=3.43, pv_1_min=3.36, pv_1_max=3.44, pv_
 
         pars=pars_1 + pars_2 + pars_3
         pars.add("constBG", 0)
-            
+
     else:
         pars = initParams
     fit_results = model.fit(intensity, pars, x=ttheta)
-    fit_ttheta=np.linspace(ttheta[0],ttheta[-1],100)
-    fit_line = [fit_ttheta,model.eval(fit_results.params,x=fit_ttheta)]
+    fit_ttheta = np.linspace(ttheta[0], ttheta[-1], 100)
+    fit_line = [fit_ttheta, model.eval(fit_results.params, x=fit_ttheta)]
     return fit_results, fit_line
 
-#### `FitCake` class for handling data loading and fitting of multiple peaks per cake ####
 
+# `FitCake` class for handling data loading and fitting of multiple peaks per cake ####
 class FitCake:
     
     """ Class for reading in individual cakes and fitting multiple single peaks
         See examples below for usage.
-    """   
-    def __init__(self,dirname,fname,cake):
-        #Running class runs anything in the init function.
-        #self refers to the object in the class - always include this as a first argument in functions within a class.
-        #Dictionaries created with curly brakets {} allow you to store data under a name i.e. reflection.
-        self.data_dict={}
-        self.fits_dict={}
-        self.lines_dict={}
-        self.spectrum = get_cake(dirname,fname,cake=cake)
-        self.reflection_list=[]        
+    """
+
+    def __init__(self, dirname, fname, cake):
+        self.data_dict = {}
+        self.fits_dict = {}
+        self.lines_dict = {}
+        self.spectrum = get_cake(dirname, fname, cake=cake)
+        self.reflection_list = []
         
     def fit_peaks(self,reflection_list, peak_ranges, init_params=None):
         
         """ Input reflection peak labels i.e. (10-10), (0002), etc. and their associated 2-theta range as lists.
             Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
         """
-        self.reflection_list=reflection_list
-        #zip iterates through each list together
-        for reflection,p_range in zip(reflection_list, peak_ranges):
-            peak_data=get_peak(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection]=peak_data
-            #store data in dictionary with peak label as the key 
-        for reflection,peak_data in self.data_dict.items():
-            #why reflection,peak_data?
+        self.reflection_list = reflection_list
+        # zip iterates through each list together
+        for reflection, p_range in zip(reflection_list, peak_ranges):
+            peak_data = get_peak(self.spectrum, ttheta_lims=p_range)
+            self.data_dict[reflection] = peak_data
+            # store data in dictionary with peak label as the key
+        for reflection, peak_data in self.data_dict.items():
+            # why reflection,peak_data?
             # to pick out key and values, to loop through the peak labels and pass on the peak data
-            fit_results, fit_line=fit_peak(peak_data,initParams=None)
-            self.fits_dict[reflection]=fit_results
-            self.lines_dict[reflection]=np.array(fit_line).T
-            #why transpose the array? - for vertical stack, so x[o] = [1 11] rather than [1,2,3,...]
+            fit_results, fit_line = fit_peak(peak_data, initParams=None)
+            self.fits_dict[reflection] = fit_results
+            self.lines_dict[reflection] = np.array(fit_line).T
+            # why transpose the array? - for vertical stack, so x[o] = [1 11] rather than [1,2,3,...]
     
     def fit_peaks_init_params(self,reflection_list, peak_ranges, init_params):
         
@@ -227,207 +216,213 @@ class FitCake:
             This function also allows the user to pass the initial parameters to the fitting function.
             Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
         """
-        self.reflection_list=reflection_list
-        #zip iterates through each list together
-        for reflection,p_range in zip(reflection_list, peak_ranges):
-            peak_data=get_peak(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection]=peak_data
-            #store data in dictionary with peak label as the key 
-        for reflection,peak_data in self.data_dict.items():
-            #why reflection,peak_data?
+        self.reflection_list = reflection_list
+        # zip iterates through each list together
+        for reflection, p_range in zip(reflection_list, peak_ranges):
+            peak_data = get_peak(self.spectrum, ttheta_lims=p_range)
+            self.data_dict[reflection] = peak_data
+            # store data in dictionary with peak label as the key
+        for reflection, peak_data in self.data_dict.items():
+            # why reflection,peak_data?
             # to pick out key and values, to loop through the peak labels and pass on the peak data
-            fit_results, fit_line=fit_peak(peak_data,initParams=init_params.fits_dict[reflection].params)
-            self.fits_dict[reflection]=fit_results
-            self.lines_dict[reflection]=np.array(fit_line).T
-            #why transpose the array? - for vertical stack, so x[o] = [1 11] rather than [1,2,3,...]
-    
-    def plot_fit(self,reflection):
-        
+            fit_results, fit_line = fit_peak(peak_data, initParams=init_params.fits_dict[reflection].params)
+            self.fits_dict[reflection] = fit_results
+            self.lines_dict[reflection] = np.array(fit_line).T
+            # why transpose the array? - for vertical stack, so x[o] = [1 11] rather than [1,2,3,...]
+
+    def plot_fit(self, reflection):
+
         """ Plot the line fit and intensity measurements.
             Input peak labels i.e. (10-10), (0002), etc.
         """
-        plt.figure(figsize=(10,8))
+        plt.figure(figsize=(10, 8))
         plt.minorticks_on()
-        plt.plot(self.lines_dict[reflection][:,0],self.lines_dict[reflection][:,1], linewidth=3)
-        plt.plot(self.data_dict[reflection][:,0],self.data_dict[reflection][:,1],'+', markersize=15, mew=3)
+        plt.plot(self.lines_dict[reflection][:, 0], self.lines_dict[reflection][:, 1], linewidth=3)
+        plt.plot(self.data_dict[reflection][:, 0], self.data_dict[reflection][:, 1], '+', markersize=15, mew=3)
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        #why r? - so can print out latex without needing double slash
+        # why r? - so can print out latex without needing double slash
         plt.title(reflection, fontsize=28)
-        plt.ylabel('Intensity',fontsize=28)
+        plt.ylabel('Intensity', fontsize=28)
         plt.tight_layout()
-        
-    def plot_spectrum(self,xmin=0, xmax=10):
-        
+
+    def plot_spectrum(self, xmin=0, xmax=10):
+
         """  Plot the intensity spectrum.
         """
-        plt.figure(figsize=(10,8))
+        plt.figure(figsize=(10, 8))
         plt.minorticks_on()
-        plt.plot(self.spectrum[:,0],self.spectrum[:,1],'-', linewidth=3)
+        plt.plot(self.spectrum[:, 0], self.spectrum[:, 1], '-', linewidth=3)
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        plt.ylabel('Intensity',fontsize=28)
-        plt.xlim(xmin,xmax)
+        plt.ylabel('Intensity', fontsize=28)
+        plt.xlim(xmin, xmax)
         plt.tight_layout()
-        
-#### `Fit2Peak` class for handling data loading and fitting 2 overlapping peaks per cake ####
 
+
+# `Fit2Peak` class for handling data loading and fitting 2 overlapping peaks per cake ####
 class Fit2Peak:
-    
     """ Class for reading in individual cakes and fitting two peaks at the same time
-    """   
-    def __init__(self,dirname,fname,cake):
-        #Running class runs anything in the init function.
-        #self refers to the object in the class - always include this as a first argument in functions within a class.
-        #Dictionaries created with curly brakets {} allow you to store data under a name i.e. reflection.
-        self.data_dict={}
-        self.fits_dict={}
-        self.lines_dict={}
-        self.spectrum = get_cake(dirname,fname,cake=cake)
-        self.reflection_list=[]        
-        
-    def fit_2_peaks(self,reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max, init_params=None):
-        
+    """
+
+    def __init__(self, dirname, fname, cake):
+        # Running class runs anything in the init function.
+        # self refers to the object in the class - always include this as a first argument in functions within a class.
+        # Dictionaries created with curly brackets {} allow you to store data under a name i.e. reflection.
+        self.data_dict = {}
+        self.fits_dict = {}
+        self.lines_dict = {}
+        self.spectrum = get_cake(dirname, fname, cake=cake)
+        self.reflection_list = []
+
+    def fit_2_peaks(self, reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max,
+                    init_params=None):
+
         """ Input reflection the collection of peak labels i.e. (0004),(220) and a 2-theta range enclosing the peaks.
             Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
         """
-        self.reflection_list=reflection_list
-        #zip iterates through each list together
-        for reflection,p_range in zip(reflection_list, peak_ranges):
-            peak_data=get_peak(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection]=peak_data
-            #store data in dictionary with peak label as the key 
-        for reflection,peak_data in self.data_dict.items():
-            #in this case the fit_two_peaks function is needed
-            fit_results, fit_line=fit_two_peaks(peak_data,pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max,initParams=None)
-            self.fits_dict[reflection]=fit_results
-            self.lines_dict[reflection]=np.array(fit_line).T
-    
-    def fit_2_peaks_init_params(self,reflection_list, peak_ranges, init_params):
-        
+        self.reflection_list = reflection_list
+        # zip iterates through each list together
+        for reflection, p_range in zip(reflection_list, peak_ranges):
+            peak_data = get_peak(self.spectrum, ttheta_lims=p_range)
+            self.data_dict[reflection] = peak_data
+            # store data in dictionary with peak label as the key
+        for reflection, peak_data in self.data_dict.items():
+            # in this case the fit_two_peaks function is needed
+            fit_results, fit_line = fit_two_peaks(peak_data, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min,
+                                                  pv_2_max, initParams=None)
+            self.fits_dict[reflection] = fit_results
+            self.lines_dict[reflection] = np.array(fit_line).T
+
+    def fit_2_peaks_init_params(self, reflection_list, peak_ranges, init_params):
+
         """ Input reflection the collection of peak labels i.e. (0004),(220) and a 2-theta range enclosing the peaks.
             This function also allows the user to pass the initial parameters to the fitting function.
             Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
         """
-        self.reflection_list=reflection_list
-        #zip iterates through each list together
-        for reflection,p_range in zip(reflection_list, peak_ranges):
-            peak_data=get_peak(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection]=peak_data
-            #store data in dictionary with peak label as the key 
-        for reflection,peak_data in self.data_dict.items():
-            #in this case the fit_two_peaks function is needed, along with passing initial parameters
-            fit_results, fit_line=fit_two_peaks(peak_data,initParams=init_params.fits_dict[reflection].params)
-            self.fits_dict[reflection]=fit_results
-            self.lines_dict[reflection]=np.array(fit_line).T
-    
-    def plot_fit(self,reflection):
-        
+        self.reflection_list = reflection_list
+        # zip iterates through each list together
+        for reflection, p_range in zip(reflection_list, peak_ranges):
+            peak_data = get_peak(self.spectrum, ttheta_lims=p_range)
+            self.data_dict[reflection] = peak_data
+            # store data in dictionary with peak label as the key
+        for reflection, peak_data in self.data_dict.items():
+            # in this case the fit_two_peaks function is needed, along with passing initial parameters
+            fit_results, fit_line = fit_two_peaks(peak_data, initParams=init_params.fits_dict[reflection].params)
+            self.fits_dict[reflection] = fit_results
+            self.lines_dict[reflection] = np.array(fit_line).T
+
+    def plot_fit(self, reflection):
+
         """ Plot the line fit and intensity measurements.
             Input peak labels i.e. (0004),(220)
         """
-        plt.figure(figsize=(10,8))
+        plt.figure(figsize=(10, 8))
         plt.minorticks_on()
-        plt.plot(self.lines_dict[reflection][:,0],self.lines_dict[reflection][:,1], linewidth=3)
-        plt.plot(self.data_dict[reflection][:,0],self.data_dict[reflection][:,1],'+', markersize=15, mew=3)
+        plt.plot(self.lines_dict[reflection][:, 0], self.lines_dict[reflection][:, 1], linewidth=3)
+        plt.plot(self.data_dict[reflection][:, 0], self.data_dict[reflection][:, 1], '+', markersize=15, mew=3)
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        plt.title(reflection,fontsize=28)
-        plt.ylabel('Intensity',fontsize=28)
+        plt.title(reflection, fontsize=28)
+        plt.ylabel('Intensity', fontsize=28)
         plt.tight_layout()
-        
-    def plot_spectrum(self,xmin=0,xmax=10):
-        
+
+    def plot_spectrum(self, xmin=0, xmax=10):
+
         """  Plot the intensity spectrum.
         """
-        plt.figure(figsize=(10,8))
+        plt.figure(figsize=(10, 8))
         plt.minorticks_on()
-        plt.plot(self.spectrum[:,0],self.spectrum[:,1],'-', linewidth=3)
-        plt.xlabel(r'Two Theta ($^\circ$)',fontsize=28)
-        plt.ylabel('Intensity',fontsize=28)
-        plt.xlim(xmin,xmax)
+        plt.plot(self.spectrum[:, 0], self.spectrum[:, 1], '-', linewidth=3)
+        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
+        plt.ylabel('Intensity', fontsize=28)
+        plt.xlim(xmin, xmax)
         plt.tight_layout()
-        
+
+
 #### `Fit3Peak` class for handling data loading and fitting 3 overlapping peaks per cake ####
 
 class Fit3Peak:
-    
     """ Class for reading in individual cakes and fitting three peaks at the same time
-    """   
-    def __init__(self,dirname,fname,cake):
-        #Running class runs anything in the init function.
-        #self refers to the object in the class - always include this as a first argument in functions within a class.
-        #Dictionaries created with curly brakets {} allow you to store data under a name i.e. reflection.
-        self.data_dict={}
-        self.fits_dict={}
-        self.lines_dict={}
-        self.spectrum = get_cake(dirname,fname,cake=cake)
-        self.reflection_list=[]        
-        
-    def fit_3_peaks(self,reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max, pv_3_cent, pv_3_min, pv_3_max, init_params=None):
-        
+    """
+
+    def __init__(self, dirname, fname, cake):
+        # Running class runs anything in the init function.
+        # self refers to the object in the class - always include this as a first argument in functions within a class.
+        # Dictionaries created with curly brakets {} allow you to store data under a name i.e. reflection.
+        self.data_dict = {}
+        self.fits_dict = {}
+        self.lines_dict = {}
+        self.spectrum = get_cake(dirname, fname, cake=cake)
+        self.reflection_list = []
+
+    def fit_3_peaks(self, reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max,
+                    pv_3_cent, pv_3_min, pv_3_max, init_params=None):
+
         """ Input reflection the collection of peak labels i.e. (0002),(110),(10-11) and a 2-theta range enclosing the peaks.
             Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
         """
-        self.reflection_list=reflection_list
-        #zip iterates through each list together
-        for reflection,p_range in zip(reflection_list, peak_ranges):
-            peak_data=get_peak(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection]=peak_data
-            #store data in dictionary with peak label as the key 
-        for reflection,peak_data in self.data_dict.items():
-            #in this case the fit_three_peaks function is needed
-            fit_results, fit_line=fit_three_peaks(peak_data,pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max, pv_3_cent, pv_3_min, pv_3_max, initParams=None)
-            self.fits_dict[reflection]=fit_results
-            self.lines_dict[reflection]=np.array(fit_line).T
-    
-    def fit_3_peaks_init_params(self,reflection_list, peak_ranges, init_params):
-        
+        self.reflection_list = reflection_list
+        # zip iterates through each list together
+        for reflection, p_range in zip(reflection_list, peak_ranges):
+            peak_data = get_peak(self.spectrum, ttheta_lims=p_range)
+            self.data_dict[reflection] = peak_data
+            # store data in dictionary with peak label as the key
+        for reflection, peak_data in self.data_dict.items():
+            # in this case the fit_three_peaks function is needed
+            fit_results, fit_line = fit_three_peaks(peak_data, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min,
+                                                    pv_2_max, pv_3_cent, pv_3_min, pv_3_max, initParams=None)
+            self.fits_dict[reflection] = fit_results
+            self.lines_dict[reflection] = np.array(fit_line).T
+
+    def fit_3_peaks_init_params(self, reflection_list, peak_ranges, init_params):
+
         """ Input reflection the collection of peak labels i.e. (0002),(110),(10-11) and a 2-theta range enclosing the peaks.
             This function also allows the user to pass the initial parameters to the fitting function.
             Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
         """
-        self.reflection_list=reflection_list
-        #zip iterates through each list together
-        for reflection,p_range in zip(reflection_list, peak_ranges):
-            peak_data=get_peak(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection]=peak_data
-            #store data in dictionary with peak label as the key 
-        for reflection,peak_data in self.data_dict.items():
-            #in this case the fit_three_peaks function is needed, along with passing initial parameters
-            fit_results, fit_line=fit_three_peaks(peak_data,initParams=init_params.fits_dict[reflection].params)       
-            self.fits_dict[reflection]=fit_results
-            self.lines_dict[reflection]=np.array(fit_line).T
-    
-    def plot_fit(self,reflection):
-        
+        self.reflection_list = reflection_list
+        # zip iterates through each list together
+        for reflection, p_range in zip(reflection_list, peak_ranges):
+            peak_data = get_peak(self.spectrum, ttheta_lims=p_range)
+            self.data_dict[reflection] = peak_data
+            # store data in dictionary with peak label as the key
+        for reflection, peak_data in self.data_dict.items():
+            # in this case the fit_three_peaks function is needed, along with passing initial parameters
+            fit_results, fit_line = fit_three_peaks(peak_data, initParams=init_params.fits_dict[reflection].params)
+            self.fits_dict[reflection] = fit_results
+            self.lines_dict[reflection] = np.array(fit_line).T
+
+    def plot_fit(self, reflection):
+
         """ Plot the line fit and intensity measurements.
             Input peak labels i.e. (0002),(110),(10-11)
         """
-        plt.figure(figsize=(10,8))
+        plt.figure(figsize=(10, 8))
         plt.minorticks_on()
-        plt.plot(self.lines_dict[reflection][:,0],self.lines_dict[reflection][:,1], linewidth=3)
-        plt.plot(self.data_dict[reflection][:,0],self.data_dict[reflection][:,1],'+', markersize=15, mew=3)
+        plt.plot(self.lines_dict[reflection][:, 0], self.lines_dict[reflection][:, 1], linewidth=3)
+        plt.plot(self.data_dict[reflection][:, 0], self.data_dict[reflection][:, 1], '+', markersize=15, mew=3)
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        plt.title(reflection,fontsize=28)
+        plt.title(reflection, fontsize=28)
         plt.ylabel('Intensity', fontsize=28)
-#         plt.ylim(0,600)
-#         plt.xlim(3.3,3.65)
+        #         plt.ylim(0,600)
+        #         plt.xlim(3.3,3.65)
         plt.tight_layout
-        
-    def plot_spectrum(self,xmin=0,xmax=10):
-        
+
+    def plot_spectrum(self, xmin=0, xmax=10):
+
         """  Plot the intensity spectrum.
         """
-        plt.figure(figsize=(10,8))
+        plt.figure(figsize=(10, 8))
         plt.minorticks_on()
-        plt.plot(self.spectrum[:,0],self.spectrum[:,1],'-',linewidth=3)
-        plt.xlabel(r'Two Theta ($^\circ$)',fontsize=28)
-        plt.ylabel('Intensity',fontsize=28)
-        plt.xlim(xmin,xmax)
+        plt.plot(self.spectrum[:, 0], self.spectrum[:, 1], '-', linewidth=3)
+        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
+        plt.ylabel('Intensity', fontsize=28)
+        plt.xlim(xmin, xmax)
         plt.tight_layout()
-        
+
+
 #### Functions for running through all the 'images' - single peak case ####
 
-def run_thru_images(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, peak_labels_init, caking_type, step=1, cake=1):
-    
+def run_thru_images(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, peak_labels_init, caking_type, step=1,
+                    cake=1):
     """  Run through all 'images of the caked data and create a FitCake class object for each.
          Return a dictionary called fits contains keys (with the image name/number) and a FitCake class object for each. 
          The FitCake class objects contain;
@@ -436,53 +431,52 @@ def run_thru_images(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, 
             - a dictionary containing a fitted line to the data, for each relection (lines_dict)
             - a dictionary containing the class object from the lmfit model for each reflection (fits_dict)
         """
-    #record the start time, note import time.
+    # record the start time, note import time.
     start_time = time.time()
-    
-    fits=dict()
 
-    peak_bounds_copy=peak_bounds_init.copy()
-    peak_labels_copy=peak_labels_init.copy()
-    #peak_bounds_copy[0]=(3.10,3.30)
-    #can't change single element, since peak_bounds_copy[0][0]=3.2 -> assignment error.
-    
-    for image_number in range(firstFile,lastFile+1,step):
-        
-        if caking_type=='normal':
-            
-            #dirname='Data/'+filePrefix + '_ascii/'
-            fnumber='_{:05d}'.format(image_number)
-            fname=filePrefix + fnumber+'.dat'
-        
-        if caking_type=='bottom' or caking_type=='top' or caking_type=='vertical' or caking_type=='horizontal':
-            
-            #dirname='Data/'+filePrefix + '_ascii/Merge/'
-            fnumber='_{:05d}'.format(image_number)
-            fname=filePrefix+'_MergeCakePoints_'+caking_type+fnumber+'.dat'
-        
-        #create a class instance
-        fitted_cake=FitCake(dirname,fname,cake)
-        fitted_cake.fit_peaks(peak_labels_copy,peak_bounds_copy)
-        fits[filePrefix+fnumber]=fitted_cake
-        
-        for i, (bounds, labels) in enumerate (zip(peak_bounds_copy,peak_labels_copy)):  
-            #Re-centre the peak bounds.
+    fits = dict()
+
+    peak_bounds_copy = peak_bounds_init.copy()
+    peak_labels_copy = peak_labels_init.copy()
+    # peak_bounds_copy[0]=(3.10,3.30)
+    # can't change single element, since peak_bounds_copy[0][0]=3.2 -> assignment error.
+
+    for image_number in range(firstFile, lastFile + 1, step):
+
+        if caking_type == 'normal':
+            # dirname='Data/'+filePrefix + '_ascii/'
+            fnumber = '_{:05d}'.format(image_number)
+            fname = filePrefix + fnumber + '.dat'
+
+        if caking_type == 'bottom' or caking_type == 'top' or caking_type == 'vertical' or caking_type == 'horizontal':
+            # dirname='Data/'+filePrefix + '_ascii/Merge/'
+            fnumber = '_{:05d}'.format(image_number)
+            fname = filePrefix + '_MergeCakePoints_' + caking_type + fnumber + '.dat'
+
+        # create a class instance
+        fitted_cake = FitCake(dirname, fname, cake)
+        fitted_cake.fit_peaks(peak_labels_copy, peak_bounds_copy)
+        fits[filePrefix + fnumber] = fitted_cake
+
+        for i, (bounds, labels) in enumerate(zip(peak_bounds_copy, peak_labels_copy)):
+            # Re-centre the peak bounds.
             thetaHalfRange = (bounds[1] - bounds[0]) / 2
-            center=fits[filePrefix+fnumber].fits_dict[labels].values['center'] 
+            center = fits[filePrefix + fnumber].fits_dict[labels].values['center']
             peak_bounds_copy[i] = (center - thetaHalfRange, center + thetaHalfRange)
-            #Can't change single element of a tuple as this returns an assignment error.
+            # Can't change single element of a tuple as this returns an assignment error.
 
         print(image_number)
-        
-    #print how long the analysis has taken
+
+    # print how long the analysis has taken
     print("--- %s seconds ---" % (time.time() - start_time))
-    
+
     return fits
 
-#### Functions for running through all the 'images' - multiple peak case (passing on initial parameters) ####
 
-def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, peak_labels_init, caking_type, peak_number, pv_1_cent=0, pv_1_min=0, pv_1_max=0, pv_2_cent=0, pv_2_min=0, pv_2_max=0, pv_3_cent=0, pv_3_min=0, pv_3_max=0, step=1, cake=1):
-    
+# Functions for running through all the 'images' - multiple peak case (passing on initial parameters)
+def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, peak_labels_init,
+                               caking_type, peak_number, pv_1_cent=0, pv_1_min=0, pv_1_max=0, pv_2_cent=0, pv_2_min=0,
+                               pv_2_max=0, pv_3_cent=0, pv_3_min=0, pv_3_max=0, step=1, cake=1):
     """  Run through all 'images of the caked data and create a FitCake class object for each.
          Passes on initial parameters to help fit multiple peaks.
          Return a dictionary called fits contains keys (with the image name/number) and a FitCake class object for each. 
@@ -492,261 +486,249 @@ def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bo
             - a dictionary containing a fitted line to the data, for each relection (lines_dict)
             - a dictionary containing the class object from the lmfit model for each reflection (fits_dict)
         """
-    #record the start time, note import time.
+    # record the start time, note import time.
     start_time = time.time()
-    
-    fits=dict()
 
-    peak_bounds_copy=peak_bounds_init.copy()
-    peak_labels_copy=peak_labels_init.copy()
-    #peak_bounds_copy[0]=(3.10,3.30)
-    #can't change single element, since peak_bounds_copy[0][0]=3.2 -> assignment error.
-    
-    firstIter=True
-    
+    fits = dict()
+
+    peak_bounds_copy = peak_bounds_init.copy()
+    peak_labels_copy = peak_labels_init.copy()
+    # peak_bounds_copy[0]=(3.10,3.30)
+    # can't change single element, since peak_bounds_copy[0][0]=3.2 -> assignment error.
+
+    firstIter = True
+
     if firstIter:
-        
-        if caking_type=='normal':
-            
-            #dirname='Data/'+filePrefix + '_ascii/'
-            fnumber='_{:05d}'.format(firstFile)
-            fname=filePrefix + fnumber+'.dat'
-        
-        if caking_type=='bottom' or caking_type=='top' or caking_type=='vertical' or caking_type=='horizontal':
-            
-            #dirname='Data/'+filePrefix + '_ascii/Merge/'
-            fnumber='_{:05d}'.format(firstFile)
-            fname=filePrefix+'_MergeCakePoints_'+caking_type+fnumber+'.dat'
-        
-        if peak_number=='one':
 
-            #create a class instance
-            fitted_cake=FitCake(dirname,fname,cake)
-            fitted_cake.fit_peaks(peak_labels_copy,peak_bounds_copy)
-            fits[filePrefix+fnumber]=fitted_cake
-            
-            for i, (bounds, labels) in enumerate (zip(peak_bounds_copy,peak_labels_copy)):  
-                #Re-centre the peak bounds.
-                thetaHalfRange = (bounds[1] - bounds[0]) / 2
-                center=fits[filePrefix+fnumber].fits_dict[labels].values['center'] 
-                peak_bounds_copy[i] = (center - thetaHalfRange, center + thetaHalfRange)
-                #Can't change single element of a tuple as this returns an assignment error. 
-            
-        if peak_number=='two':
-            
-            #create a class instance
-            fitted_cake=Fit2Peak(dirname,fname,cake)
-            fitted_cake.fit_2_peaks(peak_labels_copy,peak_bounds_copy, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max)
-            fits[filePrefix+fnumber]=fitted_cake
-            
-            #no recentering of peak bounds needed
-            
-        if peak_number=='three':
-            
-            #create a class instance
-            fitted_cake=Fit3Peak(dirname,fname,cake)
-            fitted_cake.fit_3_peaks(peak_labels_copy,peak_bounds_copy, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max, pv_3_cent, pv_3_min, pv_3_max)
-            fits[filePrefix+fnumber]=fitted_cake
-            
-            #no recentering of peak bounds needed
-    
-    firstIter=False
-    
-    for image_number in range(firstFile+1,lastFile+1,step):
-        
-        if caking_type=='normal':
-            
-            #dirname='Data/'+filePrefix + '_ascii/'
-            fnumber='_{:05d}'.format(image_number)
-            fnumber_previous='_{:05d}'.format(image_number-1)
-            fname=filePrefix + fnumber+'.dat'
-            
-        if caking_type=='bottom' or caking_type=='top' or caking_type=='vertical' or caking_type=='horizontal':
-            
-            #dirname='Data/'+filePrefix + '_ascii/Merge/'
-            fnumber='_{:05d}'.format(image_number)
-            fnumber_previous='_{:05d}'.format(image_number-1)
-            fname=filePrefix+'_MergeCakePoints_'+caking_type+fnumber+'.dat'
-        
-        if peak_number=='one':
+        if caking_type == 'normal':
+            # dirname='Data/'+filePrefix + '_ascii/'
+            fnumber = '_{:05d}'.format(firstFile)
+            fname = filePrefix + fnumber + '.dat'
 
-            #create a class instance
-            fitted_cake=FitCake(dirname,fname,cake)
-            fitted_cake.fit_peaks_init_params(peak_labels_copy,peak_bounds_copy,init_params=fits[filePrefix+fnumber_previous])
-            fits[filePrefix+fnumber]=fitted_cake
-            
-            for i, (bounds, labels) in enumerate (zip(peak_bounds_copy,peak_labels_copy)):  
-                #Re-centre the peak bounds.
+        if caking_type == 'bottom' or caking_type == 'top' or caking_type == 'vertical' or caking_type == 'horizontal':
+            # dirname='Data/'+filePrefix + '_ascii/Merge/'
+            fnumber = '_{:05d}'.format(firstFile)
+            fname = filePrefix + '_MergeCakePoints_' + caking_type + fnumber + '.dat'
+
+        if peak_number == 'one':
+
+            # create a class instance
+            fitted_cake = FitCake(dirname, fname, cake)
+            fitted_cake.fit_peaks(peak_labels_copy, peak_bounds_copy)
+            fits[filePrefix + fnumber] = fitted_cake
+
+            for i, (bounds, labels) in enumerate(zip(peak_bounds_copy, peak_labels_copy)):
+                # Re-centre the peak bounds.
                 thetaHalfRange = (bounds[1] - bounds[0]) / 2
-                center=fits[filePrefix+fnumber].fits_dict[labels].values['center'] 
+                center = fits[filePrefix + fnumber].fits_dict[labels].values['center']
                 peak_bounds_copy[i] = (center - thetaHalfRange, center + thetaHalfRange)
-                #Can't change single element of a tuple as this returns an assignment error.
-            
-        if peak_number=='two':
-        
-            #create a class instance
-            fitted_cake=Fit2Peak(dirname,fname,cake)
-            fitted_cake.fit_2_peaks_init_params(peak_labels_copy,peak_bounds_copy, init_params=fits[filePrefix+fnumber_previous])
-            fits[filePrefix+fnumber]=fitted_cake
-            
-            #no recentering of peak bounds needed
-        
-        if peak_number=='three':
-            
-            #create a class instance
-            fitted_cake=Fit3Peak(dirname,fname,cake)
-            fitted_cake.fit_3_peaks_init_params(peak_labels_copy,peak_bounds_copy, init_params=fits[filePrefix+fnumber_previous])
-            fits[filePrefix+fnumber]=fitted_cake
-            
-            #no recentering of peak bounds needed
-            
+                # Can't change single element of a tuple as this returns an assignment error.
+
+        if peak_number == 'two':
+            # create a class instance
+            fitted_cake = Fit2Peak(dirname, fname, cake)
+            fitted_cake.fit_2_peaks(peak_labels_copy, peak_bounds_copy, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent,
+                                    pv_2_min, pv_2_max)
+            fits[filePrefix + fnumber] = fitted_cake
+
+            # no recentering of peak bounds needed
+
+        if peak_number == 'three':
+            # create a class instance
+            fitted_cake = Fit3Peak(dirname, fname, cake)
+            fitted_cake.fit_3_peaks(peak_labels_copy, peak_bounds_copy, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent,
+                                    pv_2_min, pv_2_max, pv_3_cent, pv_3_min, pv_3_max)
+            fits[filePrefix + fnumber] = fitted_cake
+
+            # no recentering of peak bounds needed
+
+    for image_number in range(firstFile + 1, lastFile + 1, step):
+
+        if caking_type == 'normal':
+            # dirname='Data/'+filePrefix + '_ascii/'
+            fnumber = '_{:05d}'.format(image_number)
+            fnumber_previous = '_{:05d}'.format(image_number - 1)
+            fname = filePrefix + fnumber + '.dat'
+
+        if caking_type == 'bottom' or caking_type == 'top' or caking_type == 'vertical' or caking_type == 'horizontal':
+            # dirname='Data/'+filePrefix + '_ascii/Merge/'
+            fnumber = '_{:05d}'.format(image_number)
+            fnumber_previous = '_{:05d}'.format(image_number - 1)
+            fname = filePrefix + '_MergeCakePoints_' + caking_type + fnumber + '.dat'
+
+        if peak_number == 'one':
+
+            # create a class instance
+            fitted_cake = FitCake(dirname, fname, cake)
+            fitted_cake.fit_peaks_init_params(peak_labels_copy, peak_bounds_copy,
+                                              init_params=fits[filePrefix + fnumber_previous])
+            fits[filePrefix + fnumber] = fitted_cake
+
+            for i, (bounds, labels) in enumerate(zip(peak_bounds_copy, peak_labels_copy)):
+                # Re-centre the peak bounds.
+                thetaHalfRange = (bounds[1] - bounds[0]) / 2
+                center = fits[filePrefix + fnumber].fits_dict[labels].values['center']
+                peak_bounds_copy[i] = (center - thetaHalfRange, center + thetaHalfRange)
+                # Can't change single element of a tuple as this returns an assignment error.
+
+        if peak_number == 'two':
+            # create a class instance
+            fitted_cake = Fit2Peak(dirname, fname, cake)
+            fitted_cake.fit_2_peaks_init_params(peak_labels_copy, peak_bounds_copy,
+                                                init_params=fits[filePrefix + fnumber_previous])
+            fits[filePrefix + fnumber] = fitted_cake
+
+            # no recentering of peak bounds needed
+
+        if peak_number == 'three':
+            # create a class instance
+            fitted_cake = Fit3Peak(dirname, fname, cake)
+            fitted_cake.fit_3_peaks_init_params(peak_labels_copy, peak_bounds_copy,
+                                                init_params=fits[filePrefix + fnumber_previous])
+            fits[filePrefix + fnumber] = fitted_cake
+
+            # no recentering of peak bounds needed
+
         print(image_number)
-        
-    #print how long the analysis has taken
+
+    # print how long the analysis has taken
     print("--- %s seconds ---" % (time.time() - start_time))
     return fits
 
-#### Functions for plotting saved data ####
 
-def plot_fit_saved_data(ref,line,data):
-
+# Functions for plotting saved data ####
+def plot_fit_saved_data(ref, line, data):
     """ Plot the line fit and intensity measurements.
         Input peak labels i.e. (10-10), (0002), etc.
     """
-    plt.figure(figsize=(10,8))
+    plt.figure(figsize=(10, 8))
     plt.minorticks_on()
-    plt.plot(line[:,0],line[:,1], linewidth=3)
-    plt.plot(data[:,0],data[:,1],'+', markersize=15, mew=3)
+    plt.plot(line[:, 0], line[:, 1], linewidth=3)
+    plt.plot(data[:, 0], data[:, 1], '+', markersize=15, mew=3)
     plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
     plt.title(ref, fontsize=28)
-    plt.ylabel('Intensity',fontsize=28)
-    plt.tight_layout
-    
-#### Function to create merged cake files for increasing intensity ####
+    plt.ylabel('Intensity', fontsize=28)
+    plt.tight_layout()
 
+
+#### Function to create merged cake files for increasing intensity ####
 def merge_peak_intensity(filePrefix, dataFolder, fileNameExtension, fileType, firstFile, lastFile, caking_type, step=1):
-    
     """  Create a file merging the peak intensities of the given cakes, increasing peak intensity.
         Options for cakes are 'bottom, 'top', 'vertical', 'horizontal'.
-    
-        """
-    for image_number in range(firstFile,lastFile+1,step):
-    
-        dirname=dataFolder+filePrefix + fileNameExtension
-        fnumber='_{:05d}'.format(image_number)
-        fname=filePrefix + fnumber+fileType
-        path=dirname+fname
+    """
+    for image_number in range(firstFile, lastFile + 1, step):
 
-        if caking_type=='bottom':
-            cake1=np.loadtxt(path, skiprows=1, usecols=(9))
-            #note, column 0 is two-theta values. Column 1 is right hand cake at -5 to 5 deg if using 10 deg slices i.e. in Dawn (-5,355)
-            cake2=np.loadtxt(path, skiprows=1, usecols=(10))
-            cake3=np.loadtxt(path, skiprows=1, usecols=(11))
-            sum_cake_intensity=cake1+cake2+cake3
+        dirname = dataFolder + filePrefix + fileNameExtension
+        fnumber = '_{:05d}'.format(image_number)
+        fname = filePrefix + fnumber + fileType
+        path = dirname + fname
 
-        if caking_type=='top':
-            cake1=np.loadtxt(path, skiprows=1, usecols=(27))
-            cake2=np.loadtxt(path, skiprows=1, usecols=(28))
-            cake3=np.loadtxt(path, skiprows=1, usecols=(29))
-            sum_cake_intensity=cake1+cake2+cake3
+        if caking_type == 'bottom':
+            cake1 = np.loadtxt(path, skiprows=1, usecols=(9))
+            # note, column 0 is two-theta values. Column 1 is right hand cake at -5 to 5 deg if using 10 deg slices i.e. in Dawn (-5,355)
+            cake2 = np.loadtxt(path, skiprows=1, usecols=(10))
+            cake3 = np.loadtxt(path, skiprows=1, usecols=(11))
+            sum_cake_intensity = cake1 + cake2 + cake3
 
+        if caking_type == 'top':
+            cake1 = np.loadtxt(path, skiprows=1, usecols=(27))
+            cake2 = np.loadtxt(path, skiprows=1, usecols=(28))
+            cake3 = np.loadtxt(path, skiprows=1, usecols=(29))
+            sum_cake_intensity = cake1 + cake2 + cake3
 
-        if caking_type=='vertical':
-            cake1=np.loadtxt(path, skiprows=1, usecols=(9))
-            cake2=np.loadtxt(path, skiprows=1, usecols=(10))
-            cake3=np.loadtxt(path, skiprows=1, usecols=(11))
-            cake4=np.loadtxt(path, skiprows=1, usecols=(27))
-            cake5=np.loadtxt(path, skiprows=1, usecols=(28))
-            cake6=np.loadtxt(path, skiprows=1, usecols=(29))
-            sum_cake_intensity=cake1+cake2+cake3+cake4+cake5+cake6
+        if caking_type == 'vertical':
+            cake1 = np.loadtxt(path, skiprows=1, usecols=(9))
+            cake2 = np.loadtxt(path, skiprows=1, usecols=(10))
+            cake3 = np.loadtxt(path, skiprows=1, usecols=(11))
+            cake4 = np.loadtxt(path, skiprows=1, usecols=(27))
+            cake5 = np.loadtxt(path, skiprows=1, usecols=(28))
+            cake6 = np.loadtxt(path, skiprows=1, usecols=(29))
+            sum_cake_intensity = cake1 + cake2 + cake3 + cake4 + cake5 + cake6
 
-        if caking_type=='horizontal':
-            cake1=np.loadtxt(path, skiprows=1, usecols=(36))
-            cake2=np.loadtxt(path, skiprows=1, usecols=(1))
-            cake3=np.loadtxt(path, skiprows=1, usecols=(2))
-            cake4=np.loadtxt(path, skiprows=1, usecols=(18))
-            cake5=np.loadtxt(path, skiprows=1, usecols=(19))
-            cake6=np.loadtxt(path, skiprows=1, usecols=(20))
-            sum_cake_intensity=cake1+cake2+cake3+cake4+cake5+cake6
-            
-        ttheta=np.loadtxt(path, skiprows=1, usecols=(0))
-        merge=np.array([ttheta,sum_cake_intensity]).T
-        #merge=np.stack([ttheta,sum_cake_intensity],axis=1)
+        if caking_type == 'horizontal':
+            cake1 = np.loadtxt(path, skiprows=1, usecols=(36))
+            cake2 = np.loadtxt(path, skiprows=1, usecols=(1))
+            cake3 = np.loadtxt(path, skiprows=1, usecols=(2))
+            cake4 = np.loadtxt(path, skiprows=1, usecols=(18))
+            cake5 = np.loadtxt(path, skiprows=1, usecols=(19))
+            cake6 = np.loadtxt(path, skiprows=1, usecols=(20))
+            sum_cake_intensity = cake1 + cake2 + cake3 + cake4 + cake5 + cake6
 
-        newfilePrefix=filePrefix+"_MergeCakeIntensity_"+caking_type
-        newfname=newfilePrefix + fnumber+fileType
-        newpath=dirname+'Merge/'+newfname
+        ttheta = np.loadtxt(path, skiprows=1, usecols=(0))
+        merge = np.array([ttheta, sum_cake_intensity]).T
+        # merge=np.stack([ttheta,sum_cake_intensity],axis=1)
+
+        newfilePrefix = filePrefix + "_MergeCakeIntensity_" + caking_type
+        newfname = newfilePrefix + fnumber + fileType
+        newpath = dirname + 'Merge/' + newfname
 
         os.makedirs(os.path.dirname(newpath), exist_ok=True)
-        np.savetxt(newpath,merge)
-        
+        np.savetxt(newpath, merge)
+
+
 #### Function to create merged cake files for greater no. of points ####
-        
 def merge_peak_points(filePrefix, dataFolder, fileNameExtension, fileType, firstFile, lastFile, caking_type, step=1):
-    
     """  Create a file merging the given cakes, giving a greater number of points at each 2-theta value.
         Options for cakes are 'bottom, 'top', 'vertical', 'horizontal'.
         """
-    for image_number in range(firstFile,lastFile+1,step):
+    for image_number in range(firstFile, lastFile + 1, step):
 
-        dirname=dataFolder+filePrefix + fileNameExtension
-        fnumber='_{:05d}'.format(image_number)
-        fname=filePrefix + fnumber+fileType
-        path=dirname+fname
+        dirname = dataFolder + filePrefix + fileNameExtension
+        fnumber = '_{:05d}'.format(image_number)
+        fname = filePrefix + fnumber + fileType
+        path = dirname + fname
 
-        if caking_type=='bottom':
-            cakes=np.loadtxt(path, skiprows=1, usecols=(0,9,10,11))
-            #note, column 0 is two-theta values. Column 1 is right hand cake at -5 to 5 deg if using 10 deg slices i.e. in Dawn (-5,355)                
-            merge=np.empty([3078,2]) #note, 1026 values of 2-theta
-
-            for i, row in enumerate(cakes):
-                merge[3*i:3*i+3,0]=row[0]
-                merge[3*i,1]=row[1]
-                merge[3*i+1,1]=row[2]
-                merge[3*i+2,1]=row[3]
-        
-        if caking_type=='top':
-            cakes=np.loadtxt(path, skiprows=1, usecols=(0,27,28,29))
-            merge=np.empty([3078,2]) #note, 1026 values of 2-theta
+        if caking_type == 'bottom':
+            cakes = np.loadtxt(path, skiprows=1, usecols=(0, 9, 10, 11))
+            # note, column 0 is two-theta values. Column 1 is right hand cake at -5 to 5 deg if using 10 deg slices i.e. in Dawn (-5,355)
+            merge = np.empty([3078, 2])  # note, 1026 values of 2-theta
 
             for i, row in enumerate(cakes):
-                merge[3*i:3*i+3,0]=row[0]
-                merge[3*i,1]=row[1]
-                merge[3*i+1,1]=row[2]
-                merge[3*i+2,1]=row[3]
-        
-        if caking_type=='vertical':
-            cakes=np.loadtxt(path, skiprows=1, usecols=(0,9,10,11,27,28,29))
-            merge=np.empty([6156,2])
+                merge[3 * i:3 * i + 3, 0] = row[0]
+                merge[3 * i, 1] = row[1]
+                merge[3 * i + 1, 1] = row[2]
+                merge[3 * i + 2, 1] = row[3]
+
+        if caking_type == 'top':
+            cakes = np.loadtxt(path, skiprows=1, usecols=(0, 27, 28, 29))
+            merge = np.empty([3078, 2])  # note, 1026 values of 2-theta
 
             for i, row in enumerate(cakes):
-                merge[6*i:6*i+6,0]=row[0]
-                merge[6*i,1]=row[1]
-                merge[6*i+1,1]=row[2]
-                merge[6*i+2,1]=row[3]
-                merge[6*i+3,1]=row[4]
-                merge[6*i+4,1]=row[5]
-                merge[6*i+5,1]=row[6]
-                             
-        if caking_type=='horizontal':
-            cakes=np.loadtxt(path, skiprows=1, usecols=(0,36,1,2,18,19,20))
-            merge=np.empty([6156,2])
+                merge[3 * i:3 * i + 3, 0] = row[0]
+                merge[3 * i, 1] = row[1]
+                merge[3 * i + 1, 1] = row[2]
+                merge[3 * i + 2, 1] = row[3]
+
+        if caking_type == 'vertical':
+            cakes = np.loadtxt(path, skiprows=1, usecols=(0, 9, 10, 11, 27, 28, 29))
+            merge = np.empty([6156, 2])
 
             for i, row in enumerate(cakes):
-                merge[6*i:6*i+6,0]=row[0]
-                merge[6*i,1]=row[1]
-                merge[6*i+1,1]=row[2]
-                merge[6*i+2,1]=row[3]
-                merge[6*i+3,1]=row[4]
-                merge[6*i+4,1]=row[5]
-                merge[6*i+5,1]=row[6]
-    
-    
-        newfilePrefix=filePrefix+"_MergeCakePoints_"+ caking_type
-        newfname=newfilePrefix + fnumber+fileType
-        newpath=dirname+'Merge/'+newfname
+                merge[6 * i:6 * i + 6, 0] = row[0]
+                merge[6 * i, 1] = row[1]
+                merge[6 * i + 1, 1] = row[2]
+                merge[6 * i + 2, 1] = row[3]
+                merge[6 * i + 3, 1] = row[4]
+                merge[6 * i + 4, 1] = row[5]
+                merge[6 * i + 5, 1] = row[6]
+
+        if caking_type == 'horizontal':
+            cakes = np.loadtxt(path, skiprows=1, usecols=(0, 36, 1, 2, 18, 19, 20))
+            merge = np.empty([6156, 2])
+
+            for i, row in enumerate(cakes):
+                merge[6 * i:6 * i + 6, 0] = row[0]
+                merge[6 * i, 1] = row[1]
+                merge[6 * i + 1, 1] = row[2]
+                merge[6 * i + 2, 1] = row[3]
+                merge[6 * i + 3, 1] = row[4]
+                merge[6 * i + 4, 1] = row[5]
+                merge[6 * i + 5, 1] = row[6]
+
+        newfilePrefix = filePrefix + "_MergeCakePoints_" + caking_type
+        newfname = newfilePrefix + fnumber + fileType
+        newpath = dirname + 'Merge/' + newfname
 
         os.makedirs(os.path.dirname(newpath), exist_ok=True)
 
-        np.savetxt(newpath,merge)
-        
+        np.savetxt(newpath, merge)

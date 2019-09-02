@@ -2,4 +2,6 @@
 ._*
 __pycache__/
 .ipynb_checkpoints/
-.fuse*
+*.fuse
+/.idea
+/venv
