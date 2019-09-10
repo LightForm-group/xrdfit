@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
 from lmfit import Model
-from typing import List
+from typing import List, Tuple
 import time
 import os
 
@@ -64,6 +64,38 @@ def get_spectrum_subset(spectrum, ttheta_lims=(0, 10)):
 def line(x, constBG):
         "constant Background"
         return constBG
+
+
+def fit_x_peaks(peak_data: List[Tuple[float, float, float]], initParams=None):
+    # Fit an arbitrary number of peaks.
+    ttheta = peak_data[:, 0]
+    intensity = peak_data[:, 1]
+
+    combined_model = Model(line)
+    combined_params = None
+
+    for index, peak in enumerate(peak_data):
+        model_fit = PseudoVoigtModel(prefix='pv_{}'.format(index + 1))
+        combined_model += model_fit
+        if not initParams:
+            peak_params = model_fit.guess(intensity, x=ttheta)
+            peak_params['pv_{}}center'].set(cent=peak_data[index][0],
+                                            min=peak_data[index][1],
+                                            max=peak_data[index][2])
+            peak_params['pv_{}sigma'].set(min=0.01, max=0.02)
+            peak_params['pv_{}1amplitude'].set(min=0.05)
+        else:
+            peak_params = initParams
+        if not combined_params:
+            combined_parameters = peak_params
+        else:
+            combined_params += peak_params
+    combined_params.add("constBG", 0)
+
+    fit_results = combined_model.fit(intensity, combined_params, x=ttheta)
+    fit_ttheta = np.linspace(ttheta[0], ttheta[-1], 100)
+    fit_line = [fit_ttheta, combined_model.eval(fit_results.params, x=fit_ttheta)]
+    return fit_results, fit_line
 
 
 def fit_peak(peak_data, initParams=None):
