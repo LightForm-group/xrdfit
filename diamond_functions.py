@@ -172,38 +172,12 @@ def fit_three_peaks(peak_data, pv_1_cent=3.43, pv_1_min=3.36, pv_1_max=3.44, pv_
 
 
 class FitCake:
-    """ Class for reading in individual cakes and fitting multiple single peaks
-        See examples below for usage.
-    """
-
     def __init__(self, file_path, cake):
         self.data_dict = {}
         self.fits_dict = {}
         self.lines_dict = {}
         self.spectrum = get_cake(file_path, cake=cake)
         self.reflection_list = []
-        
-    def fit_peaks(self, reflection_list: List[str], peak_ranges: List[tuple], init_params=None):
-        """ Attempt to fit peaks within the ranges specified by `peak_ranges`.
-        :param reflection_list: One label for each peak.
-        :param peak_ranges: A tuple for each peak specifying where on the x-axis the peak begins
-        and ends.
-        :param init_params: Initial parameters to the fitting function
-        """
-        self.reflection_list = reflection_list
-        # zip iterates through each list together
-        for reflection, p_range in zip(reflection_list, peak_ranges):
-            # store data in dictionary with peak label as the key
-            self.data_dict[reflection] = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
-
-            if init_params:
-                fit_results, fit_line = fit_peak(self.data_dict[reflection],
-                                                 initParams=init_params.fits_dict[reflection].params)
-            else:
-                fit_results, fit_line = fit_peak(self.data_dict[reflection])
-            self.fits_dict[reflection] = fit_results
-            # Transpose the array to get appropriate row/column order.
-            self.lines_dict[reflection] = np.array(fit_line).T
 
     def plot_fit(self, reflection):
         """ Plot the line fit and intensity measurements.
@@ -230,20 +204,42 @@ class FitCake:
         plt.tight_layout()
 
 
-# `Fit2Peak` class for handling data loading and fitting 2 overlapping peaks per cake ####
-class Fit2Peak:
-    """ Class for reading in individual cakes and fitting two peaks at the same time
+class FitSingleCake(FitCake):
+    """ Class for reading in individual cakes and fitting multiple single peaks
+        See examples below for usage.
     """
 
     def __init__(self, file_path, cake):
-        # Running class runs anything in the init function.
-        # self refers to the object in the class - always include this as a first argument in functions within a class.
-        # Dictionaries created with curly brackets {} allow you to store data under a name i.e. reflection.
-        self.data_dict = {}
-        self.fits_dict = {}
-        self.lines_dict = {}
-        self.spectrum = get_cake(file_path, cake=cake)
-        self.reflection_list = []
+        super().__init__(file_path, cake)
+
+    def fit_peaks(self, reflection_list: List[str], peak_ranges: List[tuple], init_params=None):
+        """ Attempt to fit peaks within the ranges specified by `peak_ranges`.
+        :param reflection_list: One label for each peak.
+        :param peak_ranges: A tuple for each peak specifying where on the x-axis the peak begins
+        and ends.
+        :param init_params: Initial parameters to the fitting function
+        """
+        self.reflection_list = reflection_list
+        # zip iterates through each list together
+        for reflection, p_range in zip(reflection_list, peak_ranges):
+            # store data in dictionary with peak label as the key
+            self.data_dict[reflection] = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
+
+            if init_params:
+                fit_results, fit_line = fit_peak(self.data_dict[reflection],
+                                                 initParams=init_params.fits_dict[reflection].params)
+            else:
+                fit_results, fit_line = fit_peak(self.data_dict[reflection])
+            self.fits_dict[reflection] = fit_results
+            # Transpose the array to get appropriate row/column order.
+            self.lines_dict[reflection] = np.array(fit_line).T
+
+
+class Fit2Peak(FitCake):
+    """ Class for reading in individual cakes and fitting two peaks at the same time
+    """
+    def __init__(self, file_path, cake):
+        super().__init__(file_path, cake)
 
     def fit_2_peaks(self, reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max,
                     init_params=None):
@@ -259,76 +255,24 @@ class Fit2Peak:
             # store data in dictionary with peak label as the key
         for reflection, peak_data in self.data_dict.items():
             # in this case the fit_two_peaks function is needed
-            fit_results, fit_line = fit_two_peaks(peak_data, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min,
-                                                  pv_2_max, initParams=None)
+            if init_params:
+                fit_results, fit_line = fit_two_peaks(peak_data, initParams=init_params.fits_dict[
+                    reflection].params)
+            else:
+                fit_results, fit_line = fit_two_peaks(peak_data, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min,
+                                                  pv_2_max)
             self.fits_dict[reflection] = fit_results
             self.lines_dict[reflection] = np.array(fit_line).T
 
-    def fit_2_peaks_init_params(self, reflection_list, peak_ranges, init_params):
 
-        """ Input reflection the collection of peak labels i.e. (0004),(220) and a 2-theta range enclosing the peaks.
-            This function also allows the user to pass the initial parameters to the fitting function.
-            Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
-        """
-        self.reflection_list = reflection_list
-        # zip iterates through each list together
-        for reflection, p_range in zip(reflection_list, peak_ranges):
-            peak_data = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection] = peak_data
-            # store data in dictionary with peak label as the key
-        for reflection, peak_data in self.data_dict.items():
-            # in this case the fit_two_peaks function is needed, along with passing initial parameters
-            fit_results, fit_line = fit_two_peaks(peak_data, initParams=init_params.fits_dict[reflection].params)
-            self.fits_dict[reflection] = fit_results
-            self.lines_dict[reflection] = np.array(fit_line).T
-
-    def plot_fit(self, reflection):
-
-        """ Plot the line fit and intensity measurements.
-            Input peak labels i.e. (0004),(220)
-        """
-        plt.figure(figsize=(10, 8))
-        plt.minorticks_on()
-        plt.plot(self.lines_dict[reflection][:, 0], self.lines_dict[reflection][:, 1], linewidth=3)
-        plt.plot(self.data_dict[reflection][:, 0], self.data_dict[reflection][:, 1], '+', markersize=15, mew=3)
-        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        plt.title(reflection, fontsize=28)
-        plt.ylabel('Intensity', fontsize=28)
-        plt.tight_layout()
-
-    def plot_spectrum(self, xmin=0, xmax=10):
-
-        """  Plot the intensity spectrum.
-        """
-        plt.figure(figsize=(10, 8))
-        plt.minorticks_on()
-        plt.plot(self.spectrum[:, 0], self.spectrum[:, 1], '-', linewidth=3)
-        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        plt.ylabel('Intensity', fontsize=28)
-        plt.xlim(xmin, xmax)
-        plt.tight_layout()
-
-
-class Fit3Peak:
+class Fit3Peak(FitCake):
     """ Class for reading in individual cakes and fitting three peaks at the same time
     """
-
     def __init__(self, file_path, cake):
-        # Running class runs anything in the init function.
-        # self refers to the object in the class - always include this as a first argument in functions within a class.
-        # Dictionaries created with curly brakets {} allow you to store data under a name i.e. reflection.
-        self.data_dict = {}
-        self.fits_dict = {}
-        self.lines_dict = {}
-        self.spectrum = get_cake(file_path, cake=cake)
-        self.reflection_list = []
+        super().__init__(file_path, cake)
 
-    def fit_3_peaks(self, reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max,
-                    pv_3_cent, pv_3_min, pv_3_max, init_params=None):
-
-        """ Input reflection the collection of peak labels i.e. (0002),(110),(10-11) and a 2-theta range enclosing the peaks.
-            Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
-        """
+    def fit_3_peaks(self, reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent,
+                    pv_2_min, pv_2_max, pv_3_cent, pv_3_min, pv_3_max, init_params=None):
         self.reflection_list = reflection_list
         # zip iterates through each list together
         for reflection, p_range in zip(reflection_list, peak_ranges):
@@ -337,52 +281,15 @@ class Fit3Peak:
             # store data in dictionary with peak label as the key
         for reflection, peak_data in self.data_dict.items():
             # in this case the fit_three_peaks function is needed
-            fit_results, fit_line = fit_three_peaks(peak_data, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min,
-                                                    pv_2_max, pv_3_cent, pv_3_min, pv_3_max, initParams=None)
+            if init_params:
+                fit_results, fit_line = fit_three_peaks(peak_data, initParams=init_params.fits_dict[
+                    reflection].params)
+            else:
+                fit_results, fit_line = fit_three_peaks(peak_data, pv_1_cent, pv_1_min, pv_1_max,
+                                                        pv_2_cent, pv_2_min, pv_2_max, pv_3_cent,
+                                                        pv_3_min, pv_3_max, initParams=None)
             self.fits_dict[reflection] = fit_results
             self.lines_dict[reflection] = np.array(fit_line).T
-
-    def fit_3_peaks_init_params(self, reflection_list, peak_ranges, init_params):
-
-        """ Input reflection the collection of peak labels i.e. (0002),(110),(10-11) and a 2-theta range enclosing the peaks.
-            This function also allows the user to pass the initial parameters to the fitting function.
-            Calculate results of the fit (amplitude, fwhm, etc.) and the fit line and store within the dictionaries.
-        """
-        self.reflection_list = reflection_list
-        # zip iterates through each list together
-        for reflection, p_range in zip(reflection_list, peak_ranges):
-            peak_data = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection] = peak_data
-            # store data in dictionary with peak label as the key
-        for reflection, peak_data in self.data_dict.items():
-            # in this case the fit_three_peaks function is needed, along with passing initial parameters
-            fit_results, fit_line = fit_three_peaks(peak_data, initParams=init_params.fits_dict[reflection].params)
-            self.fits_dict[reflection] = fit_results
-            self.lines_dict[reflection] = np.array(fit_line).T
-
-    def plot_fit(self, reflection):
-        """ Plot the line fit and intensity measurements.
-        Input peak labels i.e. (0002),(110),(10-11)"""
-        plt.figure(figsize=(10, 8))
-        plt.minorticks_on()
-        plt.plot(self.lines_dict[reflection][:, 0], self.lines_dict[reflection][:, 1], linewidth=3)
-        plt.plot(self.data_dict[reflection][:, 0], self.data_dict[reflection][:, 1], '+', markersize=15, mew=3)
-        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        plt.title(reflection, fontsize=28)
-        plt.ylabel('Intensity', fontsize=28)
-        #         plt.ylim(0,600)
-        #         plt.xlim(3.3,3.65)
-        plt.tight_layout()
-
-    def plot_spectrum(self, xmin=0, xmax=10):
-        """ Plot the intensity spectrum."""
-        plt.figure(figsize=(10, 8))
-        plt.minorticks_on()
-        plt.plot(self.spectrum[:, 0], self.spectrum[:, 1], '-', linewidth=3)
-        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        plt.ylabel('Intensity', fontsize=28)
-        plt.xlim(xmin, xmax)
-        plt.tight_layout()
 
 
 #### Functions for running through all the 'images' - single peak case ####
@@ -419,7 +326,7 @@ def run_thru_images(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, 
             fname = filePrefix + '_MergeCakePoints_' + caking_type + fnumber + '.dat'
 
         # create a class instance
-        fitted_cake = FitCake(dirname + fname, cake)
+        fitted_cake = FitSingleCake(dirname + fname, cake)
         fitted_cake.fit_peaks(peak_labels_copy, peak_bounds_copy)
         fits[filePrefix + fnumber] = fitted_cake
 
@@ -478,7 +385,7 @@ def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bo
         if peak_number == 'one':
 
             # create a class instance
-            fitted_cake = FitCake(dirname + fname, cake)
+            fitted_cake = FitSingleCake(dirname + fname, cake)
             fitted_cake.fit_peaks(peak_labels_copy, peak_bounds_copy)
             fits[filePrefix + fnumber] = fitted_cake
 
@@ -524,7 +431,7 @@ def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bo
         if peak_number == 'one':
 
             # create a class instance
-            fitted_cake = FitCake(dirname + fname, cake)
+            fitted_cake = FitSingleCake(dirname + fname, cake)
             fitted_cake.fit_peaks(peak_labels_copy, peak_bounds_copy,
                                               init_params=fits[filePrefix + fnumber_previous])
             fits[filePrefix + fnumber] = fitted_cake
@@ -539,8 +446,8 @@ def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bo
         if peak_number == 'two':
             # create a class instance
             fitted_cake = Fit2Peak(dirname, fname, cake)
-            fitted_cake.fit_2_peaks_init_params(peak_labels_copy, peak_bounds_copy,
-                                                init_params=fits[filePrefix + fnumber_previous])
+            fitted_cake.fit_2_peaks(peak_labels_copy, peak_bounds_copy,
+                                    init_params=fits[filePrefix + fnumber_previous])
             fits[filePrefix + fnumber] = fitted_cake
 
             # no recentering of peak bounds needed
@@ -548,8 +455,8 @@ def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bo
         if peak_number == 'three':
             # create a class instance
             fitted_cake = Fit3Peak(dirname, fname, cake)
-            fitted_cake.fit_3_peaks_init_params(peak_labels_copy, peak_bounds_copy,
-                                                init_params=fits[filePrefix + fnumber_previous])
+            fitted_cake.fit_3_peaks(peak_labels_copy, peak_bounds_copy,
+                                    init_params=fits[filePrefix + fnumber_previous])
             fits[filePrefix + fnumber] = fitted_cake
 
             # no recentering of peak bounds needed
