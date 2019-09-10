@@ -90,7 +90,6 @@ def fit_peak(peak_data, initParams=None):
 
 # Functions for fitting two and three peaks
 def fit_two_peaks(peak_data, pv_1_cent=6.45, pv_1_min=6.37, pv_1_max=6.47, pv_2_cent=6.54, pv_2_min=6.46, pv_2_max=6.56, initParams=None):
-    
     """ Pseudo-Voigt fit to the lattice plane peak intensity for two peaks (adjust function to include more).
         Parameters for each peak also require limits and centres to be set in the case of overlapping peaks.
         Return results of the fit as an lmfit class, which contains the fitted parameters (amplitude, fwhm, etc.) 
@@ -128,8 +127,8 @@ def fit_two_peaks(peak_data, pv_1_cent=6.45, pv_1_min=6.37, pv_1_max=6.47, pv_2_
     fit_line = [fit_ttheta,model.eval(fit_results.params,x=fit_ttheta)]
     return fit_results, fit_line
 
+
 def fit_three_peaks(peak_data, pv_1_cent=3.43, pv_1_min=3.36, pv_1_max=3.44, pv_2_cent=3.52, pv_2_min=3.42, pv_2_max=3.55, pv_3_cent=3.59, pv_3_min=3.54, pv_3_max=3.6, initParams=None):
-    
     """ Pseudo-Voigt fit to the lattice plane peak intensity for three peaks (adjust function to include more).
         Parameters for each peak also require limits and centres to be set in the case of overlapping peaks.
         Return results of the fit as an lmfit class, which contains the fitted parameters (amplitude, fwhm, etc.) 
