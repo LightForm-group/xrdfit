@@ -47,12 +47,11 @@ def relative_amplitude(amp):
 
 
 # Functions for loading up data and fitting
-def get_cake(dirname, file_name, cake=1):
+def get_cake(file_path, cake=1):
     """ Return 'spectrum' containing 2-theta increments and intensity values for a given cake.
         Note, assumed DAWN output data has 2-theta in column 0 and intensity of first cake in column 1.
     """
-    file_name = dirname + file_name
-    spectrum = np.loadtxt(file_name, usecols=(0, cake))
+    spectrum = np.loadtxt(file_path, usecols=(0, cake))
     return spectrum
               
 
@@ -184,11 +183,11 @@ class FitCake:
         See examples below for usage.
     """
 
-    def __init__(self, dirname, fname, cake):
+    def __init__(self, file_path, cake):
         self.data_dict = {}
         self.fits_dict = {}
         self.lines_dict = {}
-        self.spectrum = get_cake(dirname, fname, cake=cake)
+        self.spectrum = get_cake(file_path, cake=cake)
         self.reflection_list = []
         
     def fit_peaks(self,reflection_list, peak_ranges, init_params=None):
@@ -263,14 +262,14 @@ class Fit2Peak:
     """ Class for reading in individual cakes and fitting two peaks at the same time
     """
 
-    def __init__(self, dirname, fname, cake):
+    def __init__(self, file_path, cake):
         # Running class runs anything in the init function.
         # self refers to the object in the class - always include this as a first argument in functions within a class.
         # Dictionaries created with curly brackets {} allow you to store data under a name i.e. reflection.
         self.data_dict = {}
         self.fits_dict = {}
         self.lines_dict = {}
-        self.spectrum = get_cake(dirname, fname, cake=cake)
+        self.spectrum = get_cake(file_path, cake=cake)
         self.reflection_list = []
 
     def fit_2_peaks(self, reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max,
@@ -343,14 +342,14 @@ class Fit3Peak:
     """ Class for reading in individual cakes and fitting three peaks at the same time
     """
 
-    def __init__(self, dirname, fname, cake):
+    def __init__(self, file_path, cake):
         # Running class runs anything in the init function.
         # self refers to the object in the class - always include this as a first argument in functions within a class.
         # Dictionaries created with curly brakets {} allow you to store data under a name i.e. reflection.
         self.data_dict = {}
         self.fits_dict = {}
         self.lines_dict = {}
-        self.spectrum = get_cake(dirname, fname, cake=cake)
+        self.spectrum = get_cake(file_path, cake=cake)
         self.reflection_list = []
 
     def fit_3_peaks(self, reflection_list, peak_ranges, pv_1_cent, pv_1_min, pv_1_max, pv_2_cent, pv_2_min, pv_2_max,
@@ -404,7 +403,7 @@ class Fit3Peak:
         plt.ylabel('Intensity', fontsize=28)
         #         plt.ylim(0,600)
         #         plt.xlim(3.3,3.65)
-        plt.tight_layout
+        plt.tight_layout()
 
     def plot_spectrum(self, xmin=0, xmax=10):
 
@@ -454,7 +453,7 @@ def run_thru_images(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, 
             fname = filePrefix + '_MergeCakePoints_' + caking_type + fnumber + '.dat'
 
         # create a class instance
-        fitted_cake = FitCake(dirname, fname, cake)
+        fitted_cake = FitCake(dirname + fname, cake)
         fitted_cake.fit_peaks(peak_labels_copy, peak_bounds_copy)
         fits[filePrefix + fnumber] = fitted_cake
 
@@ -513,7 +512,7 @@ def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bo
         if peak_number == 'one':
 
             # create a class instance
-            fitted_cake = FitCake(dirname, fname, cake)
+            fitted_cake = FitCake(dirname + fname, cake)
             fitted_cake.fit_peaks(peak_labels_copy, peak_bounds_copy)
             fits[filePrefix + fnumber] = fitted_cake
 
@@ -559,7 +558,7 @@ def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bo
         if peak_number == 'one':
 
             # create a class instance
-            fitted_cake = FitCake(dirname, fname, cake)
+            fitted_cake = FitCake(dirname + fname, cake)
             fitted_cake.fit_peaks_init_params(peak_labels_copy, peak_bounds_copy,
                                               init_params=fits[filePrefix + fnumber_previous])
             fits[filePrefix + fnumber] = fitted_cake
