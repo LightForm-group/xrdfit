@@ -148,23 +148,30 @@ class FitPeak():
         """ Plot the line fit and intensity measurements.
         Input peak labels i.e. (10-10), (0002), etc.
         """
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(8, 6))
+        label_size = 20
         plt.minorticks_on()
-        plt.plot(self.lines_dict[reflection][:, 0], self.lines_dict[reflection][:, 1], linewidth=3)
-        plt.plot(self.data_dict[reflection][:, 0], self.data_dict[reflection][:, 1], '+', markersize=15, mew=3)
-        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        # why r? - so can print out latex without needing double slash
-        plt.title(reflection, fontsize=28)
-        plt.ylabel('Intensity', fontsize=28)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        plt.tight_layout()
+        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
+        plt.ylabel('Intensity', fontsize=label_size)
+        plt.plot(self.data_dict[reflection][:, 0], self.data_dict[reflection][:, 1], 'b+', ms=15, mew=3, label="Spectrum")
+        plt.plot(self.lines_dict[reflection][:, 0], self.lines_dict[reflection][:, 1], 'k--', lw=1, label="Fit")
+        plt.legend()
+        plt.title(reflection, fontsize=label_size)
         plt.tight_layout()
 
     def plot_spectrum(self, xmin=0, xmax=10):
         """Plot the intensity spectrum."""
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(8, 6))
+        label_size = 20
         plt.minorticks_on()
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
         plt.plot(self.spectrum[:, 0], self.spectrum[:, 1], '-', linewidth=3)
-        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=28)
-        plt.ylabel('Intensity', fontsize=28)
+        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
+        plt.ylabel('Intensity', fontsize=label_size)
         plt.xlim(xmin, xmax)
         plt.tight_layout()
 
