@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
 from lmfit import Model
 from typing import List
-from abc import ABC
 
 
 class PeakParams:
@@ -95,7 +94,7 @@ def line(x, constBG):
     return constBG
 
 
-def fit_peaks(peak_data, peak_params: List[PeakParams]):
+def do_pv_fit(peak_data, peak_params: List[PeakParams]):
     """
     Pseudo-Voigt fit to the lattice plane peak intensity.
     Return results of the fit as an lmfit class, which contains the fitted parameters
@@ -110,7 +109,7 @@ def fit_peaks(peak_data, peak_params: List[PeakParams]):
 
     for index, peak in enumerate(peak_params):
         # Add the peak to the model
-        peak_prefix = "pv_{}".format(index + 1)
+        peak_prefix = "peak_{}_".format(index + 1)
         model = PseudoVoigtModel(prefix=peak_prefix)
         if combined_model:
             combined_model += model
@@ -136,7 +135,7 @@ def fit_peaks(peak_data, peak_params: List[PeakParams]):
     return fit_results, fit_line
 
 
-class FitPeak(ABC):
+class FitPeak():
     """An object that handles fitting peaks in a spectrum."""
     def __init__(self, file_path, cake):
         self.data_dict = {}
@@ -169,64 +168,17 @@ class FitPeak(ABC):
         plt.xlim(xmin, xmax)
         plt.tight_layout()
 
-
-class FitSingletPeak(FitPeak):
-    """ Class for reading in individual cakes and fitting multiple single peaks
-        See examples below for usage.
-    """
-
-    def __init__(self, file_path, cake):
-        super().__init__(file_path, cake)
-
-    def fit_peaks(self, reflection_list: List[str], peak_ranges: List[tuple], peak_params: List[PeakParams]):
+    def fit_peaks(self, reflection_list: List[str], peak_ranges: List[tuple], peak_params: List[List[PeakParams]]):
         """ Attempt to fit peaks within the ranges specified by `peak_ranges`.
         :param reflection_list: One label for each peak.
         :param peak_ranges: A tuple for each peak specifying where on the x-axis the peak begins
         and ends.
+        :param peak_params: One list of PeakParams for each peak in the spectrum.
         """
         self.reflection_list = reflection_list
-        # zip iterates through each list together
         for reflection, p_range, p1 in zip(reflection_list, peak_ranges, peak_params):
-            # store data in dictionary with peak label as the key
             self.data_dict[reflection] = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
-            fit_results, fit_line = fit_peaks(self.data_dict[reflection], [p1])
+            fit_results, fit_line = do_pv_fit(self.data_dict[reflection], p1)
             self.fits_dict[reflection] = fit_results
             # Transpose the array to get appropriate row/column order.
-            self.lines_dict[reflection] = np.array(fit_line).T
-
-
-class FitDoubletPeak(FitPeak):
-    """ Class for reading in individual cakes and fitting two peaks at the same time
-    """
-    def __init__(self, file_path, cake):
-        super().__init__(file_path, cake)
-
-    def fit_2_peaks(self, reflection_list, peak_ranges, p1: PeakParams, p2: PeakParams):
-        self.reflection_list = reflection_list
-        for reflection, p_range in zip(reflection_list, peak_ranges):
-            peak_data = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection] = peak_data
-        for reflection, peak_data in self.data_dict.items():
-            fit_results, fit_line = fit_peaks(peak_data, [p1, p2])
-            self.fits_dict[reflection] = fit_results
-            self.lines_dict[reflection] = np.array(fit_line).T
-
-
-class FitTripletPeak(FitPeak):
-    """ Class for reading in individual cakes and fitting three peaks at the same time
-    """
-    def __init__(self, file_path, cake):
-        super().__init__(file_path, cake)
-
-    def fit_3_peaks(self, reflection_list, peak_ranges, p1: PeakParams, p2: PeakParams,
-                    p3: PeakParams):
-        self.reflection_list = reflection_list
-        # zip iterates through each list together
-        for reflection, p_range in zip(reflection_list, peak_ranges):
-            peak_data = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
-            self.data_dict[reflection] = peak_data
-            # store data in dictionary with peak label as the key
-        for reflection, peak_data in self.data_dict.items():
-            fit_results, fit_line = fit_peaks(peak_data, [p1, p2, p3])
-            self.fits_dict[reflection] = fit_results
             self.lines_dict[reflection] = np.array(fit_line).T
