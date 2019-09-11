@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
 from lmfit import Model
-from typing import List, Union
+from typing import List
 from abc import ABC
 
 
@@ -95,88 +95,44 @@ def line(x, constBG):
     return constBG
 
 
-def fit_peak(peak_data, p1: PeakParams):
-    """ Pseudo-Voigt fit to the lattice plane peak intensity.
-        Return results of the fit as an lmfit class, which contains the fitted parameters (amplitude, fwhm, etc.) 
-        and the fit line calculated using the fit parameters and 100x two-theta points.
+def fit_peaks(peak_data, peak_params: List[PeakParams]):
+    """
+    Pseudo-Voigt fit to the lattice plane peak intensity.
+    Return results of the fit as an lmfit class, which contains the fitted parameters
+    (amplitude, fwhm, etc.) and the fit line calculated using the fit parameters and
+    100x two-theta points.
     """
     ttheta = peak_data[:, 0]
     intensity = peak_data[:, 1]
-    pvModel = PseudoVoigtModel()
-    model = pvModel + Model(line)
 
-    pars = pvModel.guess(intensity, x=ttheta)
-    if p1.center:
-        pars['center'].set(p1.center, p1.center_min, p1.center_max)
-    pars['sigma'].set(p1.sigma_min, p1.sigma_max)
-    pars['amplitude'].set(p1.amplitude_min)
-    pars.add("constBG", 0)
+    combined_model = None
+    combined_parameters = None
 
-    fit_results = model.fit(intensity, pars, x=ttheta)
+    for index, peak in enumerate(peak_params):
+        # Add the peak to the model
+        peak_prefix = "pv_{}".format(index + 1)
+        model = PseudoVoigtModel(prefix=peak_prefix)
+        if combined_model:
+            combined_model += model
+        else:
+            combined_model = model
+
+        # Add the fit parameters for the peak
+        parameters = model.guess(intensity, x=ttheta)
+        if peak_params[index].center:
+            parameters['{}center'.format(peak_prefix)].set(peak_params[index].center, min=peak_params[index].center_min, max=peak_params[index].center_max)
+        parameters['{}sigma'.format(peak_prefix)].set(min=peak_params[index].sigma_min, max=peak_params[index].sigma_max)
+        parameters['{}amplitude'.format(peak_prefix)].set(min=peak_params[index].amplitude_min)
+        if combined_parameters:
+            combined_parameters += parameters
+        else:
+            combined_parameters = parameters
+    combined_model += Model(line)
+    combined_parameters.add("constBG", 0)
+
+    fit_results = combined_model.fit(intensity, combined_parameters, x=ttheta)
     fit_ttheta = np.linspace(ttheta[0], ttheta[-1], 100)
-    fit_line = [fit_ttheta, model.eval(fit_results.params, x=fit_ttheta)]
-    return fit_results, fit_line
-
-
-def fit_two_peaks(peak_data, peak_1: PeakParams, peak_2: PeakParams):
-    ttheta = peak_data[:, 0]
-    intensity = peak_data[:, 1]
-
-    PV_1 = PseudoVoigtModel(prefix='pv_1')
-    PV_2 = PseudoVoigtModel(prefix='pv_2')
-
-    model = PV_1 + PV_2 + Model(line)
-
-    pars_1 = PV_1.guess(intensity, x=ttheta)
-    pars_1['pv_1center'].set(peak_1.center, min=peak_1.center_min, max=peak_1.center_max)
-    pars_1['pv_1sigma'].set(min=peak_1.sigma_min, max=peak_1.sigma_max)
-    pars_1['pv_1amplitude'].set(min=peak_1.amplitude_min)
-
-    pars_2 = PV_2.guess(intensity, x=ttheta)
-    pars_2['pv_2center'].set(peak_2.center, min=peak_2.center_min, max=peak_2.center_max)
-    pars_2['pv_2sigma'].set(min=peak_2.sigma_min, max=peak_2.sigma_max)
-    pars_2['pv_2amplitude'].set(min=peak_2.amplitude_min)
-
-    pars = pars_1 + pars_2
-    pars.add("constBG", 0)
-
-    fit_results = model.fit(intensity, pars, x=ttheta)
-    fit_ttheta = np.linspace(ttheta[0], ttheta[-1], 100)
-    fit_line = [fit_ttheta, model.eval(fit_results.params, x=fit_ttheta)]
-    return fit_results, fit_line
-
-
-def fit_three_peaks(peak_data, peak_1: PeakParams, peak_2: PeakParams, peak_3: PeakParams):
-    ttheta = peak_data[:, 0]
-    intensity = peak_data[:, 1]
-
-    PV_1 = PseudoVoigtModel(prefix='pv_1')
-    PV_2 = PseudoVoigtModel(prefix='pv_2')
-    PV_3 = PseudoVoigtModel(prefix='pv_3')
-
-    model = PV_1 + PV_2 + PV_3 + Model(line)
-    
-    pars_1 = PV_1.guess(intensity, x=ttheta)
-    pars_1['pv_1center'].set(peak_1.center, peak_1.center_min, peak_1.center_max)
-    pars_1['pv_1sigma'].set(peak_1.sigma_min, peak_2.sigma_max)
-    pars_1['pv_1amplitude'].set(min=peak_1.amplitude_min)
-
-    pars_2 = PV_2.guess(intensity, x=ttheta)
-    pars_2['pv_2center'].set(peak_2.center, peak_2.center_min, peak_2.center_max)
-    pars_2['pv_2sigma'].set(peak_2.sigma_min, peak_2.sigma_max)
-    pars_2['pv_2amplitude'].set(min=peak_2.amplitude_min)
-
-    pars_3 = PV_3.guess(intensity, x=ttheta)
-    pars_3['pv_3center'].set(peak_3.center, peak_3.center_min, peak_3.center_max)
-    pars_3['pv_3sigma'].set(peak_3.sigma_min, peak_3.sigma_max)
-    pars_3['pv_3amplitude'].set(min=peak_3.amplitude_min)
-
-    pars=pars_1 + pars_2 + pars_3
-    pars.add("constBG", 0)
-
-    fit_results = model.fit(intensity, pars, x=ttheta)
-    fit_ttheta = np.linspace(ttheta[0], ttheta[-1], 100)
-    fit_line = [fit_ttheta, model.eval(fit_results.params, x=fit_ttheta)]
+    fit_line = [fit_ttheta, combined_model.eval(fit_results.params, x=fit_ttheta)]
     return fit_results, fit_line
 
 
@@ -233,7 +189,7 @@ class FitSingletPeak(FitPeak):
         for reflection, p_range, p1 in zip(reflection_list, peak_ranges, peak_params):
             # store data in dictionary with peak label as the key
             self.data_dict[reflection] = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
-            fit_results, fit_line = fit_peak(self.data_dict[reflection], p1)
+            fit_results, fit_line = fit_peaks(self.data_dict[reflection], [p1])
             self.fits_dict[reflection] = fit_results
             # Transpose the array to get appropriate row/column order.
             self.lines_dict[reflection] = np.array(fit_line).T
@@ -251,7 +207,7 @@ class FitDoubletPeak(FitPeak):
             peak_data = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
             self.data_dict[reflection] = peak_data
         for reflection, peak_data in self.data_dict.items():
-            fit_results, fit_line = fit_two_peaks(peak_data, p1, p2)
+            fit_results, fit_line = fit_peaks(peak_data, [p1, p2])
             self.fits_dict[reflection] = fit_results
             self.lines_dict[reflection] = np.array(fit_line).T
 
@@ -271,6 +227,6 @@ class FitTripletPeak(FitPeak):
             self.data_dict[reflection] = peak_data
             # store data in dictionary with peak label as the key
         for reflection, peak_data in self.data_dict.items():
-            fit_results, fit_line = fit_three_peaks(peak_data, p1, p2, p3, initParams=None)
+            fit_results, fit_line = fit_peaks(peak_data, [p1, p2, p3])
             self.fits_dict[reflection] = fit_results
             self.lines_dict[reflection] = np.array(fit_line).T
