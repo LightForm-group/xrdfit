@@ -46,18 +46,20 @@ class PeakParams:
 
 
 class PeakFit:
-    """An object containing data on the fit to a peak."""
+    """An object containing data on the fit to a peak.
+    :ivar name: The name of the peak.
+    :ivar raw_spectrum: The raw data to which the fit is made.
+    :ivar points: The fit evaluated over the range of raw_spectrum.
+    :ivar result: The lmfit result of the fit."""
     def __init__(self, name: str):
         self.name = name
-        self.data_dict = None
-        self.lines_dict = None
-        self.fit_result = None
+        self.raw_spectrum = None
+        self.points = None
+        self.result = None
 
     def plot(self):
-        """ Plot the line fit and intensity measurements.
-        Input peak labels i.e. (10-10), (0002), etc.
-        """
-        if self.data_dict is None:
+        """ Plot the raw spectral data and the fit."""
+        if self.raw_spectrum is None:
             print("Cannot plot fit peak as fitting has not been done yet.")
         else:
             plt.figure(figsize=(8, 6))
@@ -68,57 +70,19 @@ class PeakFit:
             plt.tight_layout()
             plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
             plt.ylabel('Intensity', fontsize=label_size)
-            plt.plot(self.data_dict[:, 0], self.data_dict[:, 1], 'b+', ms=15, mew=3, label="Spectrum")
-            plt.plot(self.lines_dict[:, 0], self.lines_dict[:, 1], 'k--', lw=1, label="Fit")
+            plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, 1], 'b+', ms=15, mew=3, label="Spectrum")
+            plt.plot(self.points[:, 0], self.points[:, 1], 'k--', lw=1, label="Fit")
             plt.legend()
             plt.title(self.name, fontsize=label_size)
             plt.tight_layout()
 
 
-def calc_dspacing(ttheta):
-    """ Calculate d-spacing from two-theta values.
-    """ 
-    x_ray_energy = 89.07  # in keV
-    c = 2.99792458e8
-    h = 6.62607004e-34
-    e = 1.6021766208e-19
-    x_ray_wavelength = (h * c) / (x_ray_energy * 1e3 * e)
-    
-    return x_ray_wavelength / (2 * np.sin(np.array(ttheta) * np.pi / 360))
-
-
-def calc_strain(ttheta):
-    """Calculate strain from two-theta values. Applies average of first 200 points to define
-    zero two-theta."""
-    theta = 0.5 * (np.array(ttheta)) * np.pi / 180.0
-    theta0 = np.mean(theta[0:200])
-    strain = -(theta-theta0)/np.tan(theta)
-    return strain
-
-
-def calc_strain_singlepoint(ttheta):
-    """Calculate strain from two-theta values. First two-theta values is defined as zero two-theta.
-    """
-    theta = 0.5 * (np.array(ttheta)) * np.pi / 180.0
-    theta0 = theta[0]
-    strain = -(theta - theta0) / np.tan(theta)
-    return strain
-
-
-def relative_amplitude(amp):
-    """ Calculate difference in amplitude from first measurement."""
-    amp0 = amp[2]
-    rel_amp = np.array(amp) / amp0
-    return rel_amp
-
-
-# Functions for loading up data and fitting
-def get_cake(file_path, cake=1):
+def get_cake(file_path, col_num=1):
     """ Return 'spectrum' containing 2-theta increments and intensity values for a given cake.
         Note, assumed DAWN output data has 2-theta in column 0 and intensity of first cake in
         column 1.
     """
-    spectrum = np.loadtxt(file_path, usecols=(0, cake))
+    spectrum = np.loadtxt(file_path, usecols=(0, col_num))
     return spectrum
               
 
@@ -171,15 +135,15 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
     combined_parameters.add("constBG", 0)
 
     fit_results = combined_model.fit(intensity, combined_parameters, x=ttheta)
-    fit_ttheta = np.linspace(ttheta[0], ttheta[-1], 100)
-    fit_line = [fit_ttheta, combined_model.eval(fit_results.params, x=fit_ttheta)]
+    fit_x_data = np.linspace(ttheta[0], ttheta[-1], 100)
+    fit_line = [fit_x_data, combined_model.eval(fit_results.params, x=fit_x_data)]
     return fit_results, fit_line
 
 
 class FitSpectrum:
     """An object that handles fitting peaks in a spectrum."""
     def __init__(self, file_path, cake):
-        self.spectrum = get_cake(file_path, cake=cake)
+        self.spectrum = get_cake(file_path, col_num=cake)
         print("Spectrum successfully loaded from file.")
         self.fitted_peaks = []
 
@@ -205,11 +169,11 @@ class FitSpectrum:
             peak_params = [peak_params]
         for peak in peak_params:
             new_fit = PeakFit(peak.name)
-            new_fit.data_dict = get_spectrum_subset(self.spectrum, ttheta_lims=peak.range)
-            fit_results, fit_line = do_pv_fit(new_fit.data_dict, peak.maxima)
-            new_fit.fit_result = fit_results
+            new_fit.raw_spectrum = get_spectrum_subset(self.spectrum, ttheta_lims=peak.range)
+            fit_results, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
+            new_fit.result = fit_results
             # Transpose the array to get appropriate row/column order.
-            new_fit.lines_dict = np.array(fit_line).T
+            new_fit.points = np.array(fit_line).T
             self.fitted_peaks.append(new_fit)
 
     def get_fit(self, name: str):

@@ -1,4 +1,4 @@
-from diamond_functions import MaximumParams, FitSingletPeak, FitDoubletPeak, FitTripletPeak
+from spectrum_fitting import MaximumParams, FitSingletPeak, FitDoubletPeak, FitTripletPeak
 import time
 import matplotlib.pyplot as plt
 import numpy as np
