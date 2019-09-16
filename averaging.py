@@ -1,4 +1,4 @@
-from diamond_functions import PeakParams, FitSingletPeak, FitDoubletPeak, FitTripletPeak
+from diamond_functions import MaximumParams, FitSingletPeak, FitDoubletPeak, FitTripletPeak
 import time
 import matplotlib.pyplot as plt
 import numpy as np
@@ -62,7 +62,7 @@ def run_thru_images(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, 
 
 # Functions for running through all the 'images' - multiple peak case (passing on initial parameters)
 def run_thru_images_initParams(filePrefix, dirname, firstFile, lastFile, peak_bounds_init, peak_labels_init,
-                               caking_type, peak_number, p1: PeakParams, p2: PeakParams, p3: PeakParams, step=1, cake=1):
+                               caking_type, peak_number, p1: MaximumParams, p2: MaximumParams, p3: MaximumParams, step=1, cake=1):
     """  Run through all 'images of the caked data and create a FitCake class object for each.
          Passes on initial parameters to help fit multiple peaks.
          Return a dictionary called fits contains keys (with the image name/number) and a FitCake class object for each.

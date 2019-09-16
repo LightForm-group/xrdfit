@@ -5,11 +5,11 @@ from lmfit import Model
 from typing import List
 
 
-class PeakParams:
+class MaximumParams:
+    """An object containing fitting details of a single maximum within a peak."""
     def __init__(self, peak_center=None, center_min=None, center_max=None, sigma_min=None,
                  sigma_max=None, amplitude_min=None):
         """
-        An object representing a description of a peak location.
         :param peak_center: The approximate center of the peak.
         :param center_min: The minimum bound for the center of the peak.
         :param center_max: The maximum bound for the center of the peak.
@@ -94,7 +94,7 @@ def line(x, constBG):
     return constBG
 
 
-def do_pv_fit(peak_data, peak_params: List[PeakParams]):
+def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
     """
     Pseudo-Voigt fit to the lattice plane peak intensity.
     Return results of the fit as an lmfit class, which contains the fitted parameters
@@ -135,16 +135,17 @@ def do_pv_fit(peak_data, peak_params: List[PeakParams]):
     return fit_results, fit_line
 
 
-class FitPeak():
+class FitSpectrum:
     """An object that handles fitting peaks in a spectrum."""
     def __init__(self, file_path, cake):
         self.data_dict = {}
         self.fits_dict = {}
         self.lines_dict = {}
-        self.spectrum = get_cake(file_path, cake=cake)
         self.reflection_list = []
+        self.spectrum = get_cake(file_path, cake=cake)
+        print("Spectrum successfully loaded from file.")
 
-    def plot_fit(self, reflection):
+    def plot_fit(self, label):
         """ Plot the line fit and intensity measurements.
         Input peak labels i.e. (10-10), (0002), etc.
         """
@@ -156,13 +157,13 @@ class FitPeak():
         plt.tight_layout()
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
         plt.ylabel('Intensity', fontsize=label_size)
-        plt.plot(self.data_dict[reflection][:, 0], self.data_dict[reflection][:, 1], 'b+', ms=15, mew=3, label="Spectrum")
-        plt.plot(self.lines_dict[reflection][:, 0], self.lines_dict[reflection][:, 1], 'k--', lw=1, label="Fit")
+        plt.plot(self.data_dict[label][:, 0], self.data_dict[label][:, 1], 'b+', ms=15, mew=3, label="Spectrum")
+        plt.plot(self.lines_dict[label][:, 0], self.lines_dict[label][:, 1], 'k--', lw=1, label="Fit")
         plt.legend()
-        plt.title(reflection, fontsize=label_size)
+        plt.title(label, fontsize=label_size)
         plt.tight_layout()
 
-    def plot_spectrum(self, xmin=0, xmax=10):
+    def plot_spectrum(self, x_min=0, x_max=10):
         """Plot the intensity spectrum."""
         plt.figure(figsize=(8, 6))
         label_size = 20
@@ -172,18 +173,18 @@ class FitPeak():
         plt.plot(self.spectrum[:, 0], self.spectrum[:, 1], '-', linewidth=3)
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
         plt.ylabel('Intensity', fontsize=label_size)
-        plt.xlim(xmin, xmax)
+        plt.xlim(x_min, x_max)
         plt.tight_layout()
 
-    def fit_peaks(self, reflection_list: List[str], peak_ranges: List[tuple], peak_params: List[List[PeakParams]]):
-        """ Attempt to fit peaks within the ranges specified by `peak_ranges`.
+    def fit_peaks(self, reflection_list: List[str], peak_ranges: List[tuple], maxima_params: List[List[MaximumParams]]):
+        """Attempt to fit peaks within the ranges specified by `peak_ranges`.
         :param reflection_list: One label for each peak.
         :param peak_ranges: A tuple for each peak specifying where on the x-axis the peak begins
         and ends.
-        :param peak_params: One list of PeakParams for each peak in the spectrum.
+        :param maxima_params: A set of MaximumParams for each peak in the spectrum.
         """
         self.reflection_list = reflection_list
-        for reflection, p_range, p1 in zip(reflection_list, peak_ranges, peak_params):
+        for reflection, p_range, p1 in zip(reflection_list, peak_ranges, maxima_params):
             self.data_dict[reflection] = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
             fit_results, fit_line = do_pv_fit(self.data_dict[reflection], p1)
             self.fits_dict[reflection] = fit_results
