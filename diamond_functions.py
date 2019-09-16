@@ -45,6 +45,36 @@ class PeakParams:
             self.maxima = [MaximumParams()]
 
 
+class PeakFit:
+    """An object containing data on the fit to a peak."""
+    def __init__(self, name: str):
+        self.name = name
+        self.data_dict = None
+        self.lines_dict = None
+        self.fit_result = None
+
+    def plot(self):
+        """ Plot the line fit and intensity measurements.
+        Input peak labels i.e. (10-10), (0002), etc.
+        """
+        if self.data_dict is None:
+            print("Cannot plot fit peak as fitting has not been done yet.")
+        else:
+            plt.figure(figsize=(8, 6))
+            label_size = 20
+            plt.minorticks_on()
+            plt.xticks(fontsize=14)
+            plt.yticks(fontsize=14)
+            plt.tight_layout()
+            plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
+            plt.ylabel('Intensity', fontsize=label_size)
+            plt.plot(self.data_dict[:, 0], self.data_dict[:, 1], 'b+', ms=15, mew=3, label="Spectrum")
+            plt.plot(self.lines_dict[:, 0], self.lines_dict[:, 1], 'k--', lw=1, label="Fit")
+            plt.legend()
+            plt.title(self.name, fontsize=label_size)
+            plt.tight_layout()
+
+
 def calc_dspacing(ttheta):
     """ Calculate d-spacing from two-theta values.
     """ 
@@ -149,31 +179,11 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
 class FitSpectrum:
     """An object that handles fitting peaks in a spectrum."""
     def __init__(self, file_path, cake):
-        self.data_dict = {}
-        self.fits_dict = {}
-        self.lines_dict = {}
         self.spectrum = get_cake(file_path, cake=cake)
         print("Spectrum successfully loaded from file.")
+        self.fitted_peaks = []
 
-    def plot_fit(self, label):
-        """ Plot the line fit and intensity measurements.
-        Input peak labels i.e. (10-10), (0002), etc.
-        """
-        plt.figure(figsize=(8, 6))
-        label_size = 20
-        plt.minorticks_on()
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
-        plt.tight_layout()
-        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
-        plt.ylabel('Intensity', fontsize=label_size)
-        plt.plot(self.data_dict[label][:, 0], self.data_dict[label][:, 1], 'b+', ms=15, mew=3, label="Spectrum")
-        plt.plot(self.lines_dict[label][:, 0], self.lines_dict[label][:, 1], 'k--', lw=1, label="Fit")
-        plt.legend()
-        plt.title(label, fontsize=label_size)
-        plt.tight_layout()
-
-    def plot_spectrum(self, x_min=0, x_max=10):
+    def plot(self, x_min=0, x_max=10):
         """Plot the intensity spectrum."""
         plt.figure(figsize=(8, 6))
         label_size = 20
@@ -190,11 +200,21 @@ class FitSpectrum:
         """Attempt to fit peaks within the ranges specified by `peak_ranges`.
         :param peak_params: A list of PeakParams describing the peaks to be fitted.
         """
+        self.fitted_peaks = []
         if isinstance(peak_params, PeakParams):
             peak_params = [peak_params]
         for peak in peak_params:
-            self.data_dict[peak.name] = get_spectrum_subset(self.spectrum, ttheta_lims=peak.range)
-            fit_results, fit_line = do_pv_fit(self.data_dict[peak.name], peak.maxima)
-            self.fits_dict[peak.name] = fit_results
+            new_fit = PeakFit(peak.name)
+            new_fit.data_dict = get_spectrum_subset(self.spectrum, ttheta_lims=peak.range)
+            fit_results, fit_line = do_pv_fit(new_fit.data_dict, peak.maxima)
+            new_fit.fit_result = fit_results
             # Transpose the array to get appropriate row/column order.
-            self.lines_dict[peak.name] = np.array(fit_line).T
+            new_fit.lines_dict = np.array(fit_line).T
+            self.fitted_peaks.append(new_fit)
+
+    def get_fit(self, name: str):
+        """Get a peak fit by name."""
+        for fit in self.fitted_peaks:
+            if fit.name == name:
+                return fit
+        return None
