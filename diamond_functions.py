@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
 from lmfit import Model
-from typing import List
+from typing import List, Tuple
 
 
 class MaximumParams:
@@ -32,6 +32,17 @@ class MaximumParams:
             self.amplitude_min = 0.05
         else:
             self.amplitude_min = amplitude_min
+
+
+class PeakParams:
+    """An object containing information about a peak and its maxima."""
+    def __init__(self, name: str, peak_range: Tuple[int, int], maxima: List[MaximumParams] = None):
+        self.name = name
+        self.range = peak_range
+        if maxima:
+            self.maxima = maxima
+        else:
+            self.maxima = [MaximumParams()]
 
 
 def calc_dspacing(ttheta):
@@ -141,7 +152,6 @@ class FitSpectrum:
         self.data_dict = {}
         self.fits_dict = {}
         self.lines_dict = {}
-        self.reflection_list = []
         self.spectrum = get_cake(file_path, cake=cake)
         print("Spectrum successfully loaded from file.")
 
@@ -176,17 +186,15 @@ class FitSpectrum:
         plt.xlim(x_min, x_max)
         plt.tight_layout()
 
-    def fit_peaks(self, reflection_list: List[str], peak_ranges: List[tuple], maxima_params: List[List[MaximumParams]]):
+    def fit_peaks(self, peak_params: List[PeakParams]):
         """Attempt to fit peaks within the ranges specified by `peak_ranges`.
-        :param reflection_list: One label for each peak.
-        :param peak_ranges: A tuple for each peak specifying where on the x-axis the peak begins
-        and ends.
-        :param maxima_params: A set of MaximumParams for each peak in the spectrum.
+        :param peak_params: A list of PeakParams describing the peaks to be fitted.
         """
-        self.reflection_list = reflection_list
-        for reflection, p_range, p1 in zip(reflection_list, peak_ranges, maxima_params):
-            self.data_dict[reflection] = get_spectrum_subset(self.spectrum, ttheta_lims=p_range)
-            fit_results, fit_line = do_pv_fit(self.data_dict[reflection], p1)
-            self.fits_dict[reflection] = fit_results
+        if isinstance(peak_params, PeakParams):
+            peak_params = [peak_params]
+        for peak in peak_params:
+            self.data_dict[peak.name] = get_spectrum_subset(self.spectrum, ttheta_lims=peak.range)
+            fit_results, fit_line = do_pv_fit(self.data_dict[peak.name], peak.maxima)
+            self.fits_dict[peak.name] = fit_results
             # Transpose the array to get appropriate row/column order.
-            self.lines_dict[reflection] = np.array(fit_line).T
+            self.lines_dict[peak.name] = np.array(fit_line).T
