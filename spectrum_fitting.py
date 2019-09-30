@@ -4,6 +4,8 @@ from lmfit.models import PseudoVoigtModel
 from lmfit import Model
 from typing import List, Tuple
 
+import averaging_angles
+
 
 class MaximumParams:
     """An object containing fitting details of a single maximum within a peak."""
@@ -77,15 +79,6 @@ class PeakFit:
             plt.tight_layout()
 
 
-def get_cake(file_path, col_num=1):
-    """ Return 'spectrum' containing 2-theta increments and intensity values for a given cake.
-        Note, assumed DAWN output data has 2-theta in column 0 and intensity of first cake in
-        column 1.
-    """
-    spectrum = np.loadtxt(file_path, usecols=(0, col_num))
-    return spectrum
-              
-
 def get_spectrum_subset(spectrum, ttheta_lims=(0, 10)):
     """ Return intensity values within a given 2-theta range for an individual lattice plane peak.
         Note, output 'peak' includes 2-theta increments in column 0 and intensity in column 1.
@@ -142,10 +135,27 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
 
 class FitSpectrum:
     """An object that handles fitting peaks in a spectrum."""
-    def __init__(self, file_path, cake):
-        self.spectrum = get_cake(file_path, col_num=cake)
-        print("Spectrum successfully loaded from file.")
+    def __init__(self):
+        self.spectrum = None
         self.fitted_peaks = []
+
+    def load_merged_spectrum(self, file_path: str, starting_angle: int, averaging_type: str):
+        data = np.loadtxt(file_path)
+        num_cakes = data.shape[1] - 1
+
+        if averaging_type not in averaging_angles.ANGLES:
+            print("Data not loaded. {} is an unknown averaging type. "
+                  "Use one of: {}".format(averaging_type, averaging_angles.ANGLES.keys()))
+        else:
+            cakes_to_average = averaging_angles.get_cakes_to_average(averaging_type, num_cakes,
+                                                                     starting_angle)
+            spectral_data = np.mean(data[:, cakes_to_average], axis=1)
+            self.spectrum = np.vstack((data[:, 0], spectral_data)).T
+            print("Spectrum successfully loaded from file.")
+
+    def load_single_spectrum(self, file_path, cake):
+        self.spectrum = np.loadtxt(file_path, usecols=(0, cake))
+        print("Spectrum successfully loaded from file.")
 
     def plot(self, x_min=0, x_max=10):
         """Plot the intensity spectrum."""

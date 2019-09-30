@@ -198,61 +198,6 @@ def plot_fit_saved_data(ref, line, data):
     plt.tight_layout()
 
 
-#### Function to create merged cake files for increasing intensity ####
-def merge_peak_intensity(filePrefix, dataFolder, fileNameExtension, fileType, firstFile, lastFile, caking_type, step=1):
-    """  Create a file merging the peak intensities of the given cakes, increasing peak intensity.
-        Options for cakes are 'bottom, 'top', 'vertical', 'horizontal'.
-    """
-    for image_number in range(firstFile, lastFile + 1, step):
-
-        dirname = dataFolder + filePrefix + fileNameExtension
-        fnumber = '_{:05d}'.format(image_number)
-        fname = filePrefix + fnumber + fileType
-        path = dirname + fname
-
-        if caking_type == 'bottom':
-            cake1 = np.loadtxt(path, skiprows=1, usecols=(9))
-            # note, column 0 is two-theta values. Column 1 is right hand cake at -5 to 5 deg if using 10 deg slices i.e. in Dawn (-5,355)
-            cake2 = np.loadtxt(path, skiprows=1, usecols=(10))
-            cake3 = np.loadtxt(path, skiprows=1, usecols=(11))
-            sum_cake_intensity = cake1 + cake2 + cake3
-
-        if caking_type == 'top':
-            cake1 = np.loadtxt(path, skiprows=1, usecols=(27))
-            cake2 = np.loadtxt(path, skiprows=1, usecols=(28))
-            cake3 = np.loadtxt(path, skiprows=1, usecols=(29))
-            sum_cake_intensity = cake1 + cake2 + cake3
-
-        if caking_type == 'vertical':
-            cake1 = np.loadtxt(path, skiprows=1, usecols=(9))
-            cake2 = np.loadtxt(path, skiprows=1, usecols=(10))
-            cake3 = np.loadtxt(path, skiprows=1, usecols=(11))
-            cake4 = np.loadtxt(path, skiprows=1, usecols=(27))
-            cake5 = np.loadtxt(path, skiprows=1, usecols=(28))
-            cake6 = np.loadtxt(path, skiprows=1, usecols=(29))
-            sum_cake_intensity = cake1 + cake2 + cake3 + cake4 + cake5 + cake6
-
-        if caking_type == 'horizontal':
-            cake1 = np.loadtxt(path, skiprows=1, usecols=(36))
-            cake2 = np.loadtxt(path, skiprows=1, usecols=(1))
-            cake3 = np.loadtxt(path, skiprows=1, usecols=(2))
-            cake4 = np.loadtxt(path, skiprows=1, usecols=(18))
-            cake5 = np.loadtxt(path, skiprows=1, usecols=(19))
-            cake6 = np.loadtxt(path, skiprows=1, usecols=(20))
-            sum_cake_intensity = cake1 + cake2 + cake3 + cake4 + cake5 + cake6
-
-        ttheta = np.loadtxt(path, skiprows=1, usecols=(0))
-        merge = np.array([ttheta, sum_cake_intensity]).T
-        # merge=np.stack([ttheta,sum_cake_intensity],axis=1)
-
-        newfilePrefix = filePrefix + "_MergeCakeIntensity_" + caking_type
-        newfname = newfilePrefix + fnumber + fileType
-        newpath = dirname + 'Merge/' + newfname
-
-        os.makedirs(os.path.dirname(newpath), exist_ok=True)
-        np.savetxt(newpath, merge)
-
-
 #### Function to create merged cake files for greater no. of points ####
 def merge_peak_points(filePrefix, dataFolder, fileNameExtension, fileType, firstFile, lastFile, caking_type, step=1):
     """  Create a file merging the given cakes, giving a greater number of points at each 2-theta value.
