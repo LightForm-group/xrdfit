@@ -143,13 +143,10 @@ class FitSpectrum:
         data = np.loadtxt(file_path)
         num_cakes = data.shape[1] - 1
 
-        if averaging_type not in averaging_angles.ANGLES:
-            print("Data not loaded. {} is an unknown averaging type. "
-                  "Use one of: {}".format(averaging_type, averaging_angles.ANGLES.keys()))
-        else:
-            cakes_to_average = averaging_angles.get_cakes_to_average(averaging_type, num_cakes,
+        cakes_to_average = averaging_angles.get_cakes_to_average(averaging_type, num_cakes,
                                                                      starting_angle)
-            spectral_data = np.mean(data[:, cakes_to_average], axis=1)
+        if cakes_to_average:
+            spectral_data = np.sum(data[:, cakes_to_average], axis=1)
             self.spectrum = np.vstack((data[:, 0], spectral_data)).T
             print("Spectrum successfully loaded from file.")
 

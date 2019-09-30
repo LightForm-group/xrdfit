@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 import numpy as np
 
@@ -10,7 +10,13 @@ ANGLES = {"top": [0],
           "horizontal": [90, 270]}
 
 
-def get_cakes_to_average(averaging_type: str, num_cakes: int, starting_angle: int) -> List[int]:
+def get_cakes_to_average(averaging_type: str, num_cakes: int,
+                         starting_angle: int) -> Union[None, List[int]]:
+    if averaging_type not in ANGLES:
+        print("Data not loaded. {} is an unknown averaging type. "
+              "Use one of: {}".format(averaging_type, ANGLES.keys()))
+        return None
+
     desired_angles = np.array(ANGLES[averaging_type])
     desired_cakes = list(((desired_angles - starting_angle) % 360) / 360 * num_cakes + 1)
     cakes_to_average = []
