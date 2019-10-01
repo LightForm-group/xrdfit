@@ -1,3 +1,5 @@
+import pathlib
+
 import numpy as np
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
@@ -79,14 +81,6 @@ class PeakFit:
             plt.tight_layout()
 
 
-def get_spectrum_subset(spectrum, ttheta_lims=(0, 10)):
-    """ Return intensity values within a given 2-theta range for an individual lattice plane peak.
-        Note, output 'peak' includes 2-theta increments in column 0 and intensity in column 1.
-    """
-    mask = np.logical_and(spectrum[:, 0] > ttheta_lims[0], spectrum[:, 0] < ttheta_lims[1])
-    return spectrum[mask]
-
-
 def line(x, constBG):
     """constant Background"""
     return constBG
@@ -134,9 +128,12 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
 
 
 class FitSpectrum:
-    """An object that handles fitting peaks in a spectrum."""
+    """An object that handles fitting peaks in a spectrum.
+    :ivar spectrum: (Spectrum) A Spectrum object describing the spectral data.
+    :ivar fitted_peaks: List[Lmfit result] Fits to the peaks in the spectrum.
+    """
     def __init__(self):
-        self.spectrum = None
+        self.spectral_data = None
         self.fitted_peaks = []
 
     def load_merged_spectrum(self, file_path: str, starting_angle: int, averaging_type: str):
@@ -147,11 +144,11 @@ class FitSpectrum:
                                                                      starting_angle)
         if cakes_to_average:
             spectral_data = np.sum(data[:, cakes_to_average], axis=1)
-            self.spectrum = np.vstack((data[:, 0], spectral_data)).T
+            self.spectral_data = np.vstack((data[:, 0], spectral_data)).T
             print("Spectrum successfully loaded from file.")
 
     def load_single_spectrum(self, file_path, cake):
-        self.spectrum = np.loadtxt(file_path, usecols=(0, cake))
+        self.spectral_data = np.loadtxt(file_path, usecols=(0, cake))
         print("Spectrum successfully loaded from file.")
 
     def plot(self, x_min=0, x_max=10):
@@ -161,7 +158,7 @@ class FitSpectrum:
         plt.minorticks_on()
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
-        plt.plot(self.spectrum[:, 0], self.spectrum[:, 1], '-', linewidth=3)
+        plt.plot(self.spectral_data[:, 0], self.spectral_data[:, 1], '-', linewidth=3)
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
         plt.ylabel('Intensity', fontsize=label_size)
         plt.xlim(x_min, x_max)
@@ -171,17 +168,28 @@ class FitSpectrum:
         """Attempt to fit peaks within the ranges specified by `peak_ranges`.
         :param peak_params: A list of PeakParams describing the peaks to be fitted.
         """
-        self.fitted_peaks = []
-        if isinstance(peak_params, PeakParams):
-            peak_params = [peak_params]
-        for peak in peak_params:
-            new_fit = PeakFit(peak.name)
-            new_fit.raw_spectrum = get_spectrum_subset(self.spectrum, ttheta_lims=peak.range)
-            fit_results, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
-            new_fit.result = fit_results
-            # Transpose the array to get appropriate row/column order.
-            new_fit.points = np.array(fit_line).T
-            self.fitted_peaks.append(new_fit)
+        if self.spectral_data is not None:
+            self.fitted_peaks = []
+            if isinstance(peak_params, PeakParams):
+                peak_params = [peak_params]
+            for peak in peak_params:
+                new_fit = PeakFit(peak.name)
+                new_fit.raw_spectrum = self.get_spectrum_subset(ttheta_lims=peak.range)
+                fit_results, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
+                new_fit.result = fit_results
+                # Transpose the array to get appropriate row/column order.
+                new_fit.points = np.array(fit_line).T
+                self.fitted_peaks.append(new_fit)
+        else:
+            print("No spectrum loaded, use load_single_spectrum or load_merged_spectrum "
+                  "methods to load data from a file.")
+
+    def get_spectrum_subset(self, ttheta_lims=(0, 10)):
+        """Return spectral intensity as a function of 2-theta for a selected 2-theta range.
+        peak."""
+        mask = np.logical_and(self.spectral_data[:, 0] > ttheta_lims[0],
+                              self.spectral_data[:, 0] < ttheta_lims[1])
+        return self.spectral_data[mask]
 
     def get_fit(self, name: str):
         """Get a peak fit by name."""
