@@ -136,12 +136,14 @@ class FitSpectrum:
         self.spectral_data = None
         self.fitted_peaks = []
 
-    def load_merged_spectrum(self, file_path: str, starting_angle: int, averaging_type: str):
+    def load_merged_spectrum(self, file_path: str, starting_angle: int, averaging_type: str,
+                             num_cakes_to_average: int = 3):
         data = np.loadtxt(file_path)
-        num_cakes = data.shape[1] - 1
+        num_total_cakes = data.shape[1] - 1
 
-        cakes_to_average = averaging_angles.get_cakes_to_average(averaging_type, num_cakes,
-                                                                     starting_angle)
+        cakes_to_average = averaging_angles.get_cakes_to_average(averaging_type, num_total_cakes,
+                                                                 starting_angle,
+                                                                 num_cakes_to_average)
         if cakes_to_average:
             spectral_data = np.sum(data[:, cakes_to_average], axis=1)
             self.spectral_data = np.vstack((data[:, 0], spectral_data)).T
