@@ -1,10 +1,9 @@
-import pathlib
+from typing import List, Tuple, Union
 
 import numpy as np
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
 from lmfit import Model
-from typing import List, Tuple
 
 import averaging_angles
 
@@ -40,7 +39,8 @@ class MaximumParams:
 
 class PeakParams:
     """An object containing information about a peak and its maxima."""
-    def __init__(self, name: str, peak_range: Tuple[int, int], maxima: List[MaximumParams] = None):
+    def __init__(self, name: str, peak_range: Tuple[float, float],
+                 maxima: List[MaximumParams] = None):
         self.name = name
         self.range = peak_range
         if maxima:
@@ -74,7 +74,8 @@ class PeakFit:
             plt.tight_layout()
             plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
             plt.ylabel('Intensity', fontsize=label_size)
-            plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, 1], 'b+', ms=15, mew=3, label="Spectrum")
+            plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, 1], 'b+', ms=15, mew=3,
+                     label="Spectrum")
             plt.plot(self.points[:, 0], self.points[:, 1], 'k--', lw=1, label="Fit")
             plt.legend()
             plt.title(self.name, fontsize=label_size)
@@ -111,8 +112,11 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
         # Add the fit parameters for the peak
         parameters = model.guess(intensity, x=ttheta)
         if peak_params[index].center:
-            parameters['{}center'.format(peak_prefix)].set(peak_params[index].center, min=peak_params[index].center_min, max=peak_params[index].center_max)
-        parameters['{}sigma'.format(peak_prefix)].set(min=peak_params[index].sigma_min, max=peak_params[index].sigma_max)
+            parameters['{}center'.format(peak_prefix)].set(peak_params[index].center,
+                                                           min=peak_params[index].center_min,
+                                                           max=peak_params[index].center_max)
+        parameters['{}sigma'.format(peak_prefix)].set(min=peak_params[index].sigma_min,
+                                                      max=peak_params[index].sigma_max)
         parameters['{}amplitude'.format(peak_prefix)].set(min=peak_params[index].amplitude_min)
         if combined_parameters:
             combined_parameters += parameters
@@ -129,11 +133,12 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
 
 class FitSpectrum:
     """An object that handles fitting peaks in a spectrum.
-    :ivar spectrum: (Spectrum) A Spectrum object describing the spectral data.
+    :ivar spectral_data: (NumPy array) A numpy array containing the whole diffraction pattern.
     :ivar fitted_peaks: List[Lmfit result] Fits to the peaks in the spectrum.
     """
-    def __init__(self):
-        self.spectral_data = None
+    def __init__(self, file_path):
+        self.spectral_data = np.loadtxt(file_path)
+        print("Diffraction pattern successfully loaded from file.")
         self.fitted_peaks = []
 
     def load_merged_spectrum(self, file_path: str, starting_angle: int, averaging_type: str,
@@ -149,49 +154,76 @@ class FitSpectrum:
             self.spectral_data = np.vstack((data[:, 0], spectral_data)).T
             print("Spectrum successfully loaded from file.")
 
-    def load_single_spectrum(self, file_path, cake):
-        self.spectral_data = np.loadtxt(file_path, usecols=(0, cake))
-        print("Spectrum successfully loaded from file.")
+    def plot_polar(self):
+        """Plot the whole diffraction pattern on polar axes."""
+        with np.errstate(divide='ignore'):
+            z = np.log10(self.spectral_data[:, 1:])
+        rad = self.spectral_data[:, 0]
+        num_cakes = z.shape[1]
+        azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
+        r, th = np.meshgrid(rad, azm)
 
-    def plot(self, x_min=0, x_max=10):
-        """Plot the intensity spectrum."""
+        plt.subplot(projection="polar", theta_direction=-1, theta_offset=np.deg2rad(5))
+        plt.pcolormesh(th, r, z.T)
+        plt.plot(azm, r, ls='none')
+        plt.grid()
+        # Turn on theta grid lines at the cake edges
+        plt.thetagrids([theta * 360 / num_cakes for theta in range(num_cakes)], labels=[])
+        # Turn off radial grid lines
+        plt.rgrids([])
+        # Put the cake numbers in the right places
+        ax = plt.gca()
+        trans, _, _ = ax.get_xaxis_text1_transform(0)
+        for label in range(1, num_cakes + 1):
+            ax.text(np.deg2rad(label * 10 - 5), -0.1, label, transform=trans, rotation=0,
+                    ha="center", va="center")
+
+        plt.show()
+
+    def plot(self, cake, x_min=0, x_max=10):
+        """Plot the intensity as a function of two theta for a given cake."""
         plt.figure(figsize=(8, 6))
         label_size = 20
         plt.minorticks_on()
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
-        plt.plot(self.spectral_data[:, 0], self.spectral_data[:, 1], '-', linewidth=3)
+        plt.plot(self.spectral_data[:, 0], self.spectral_data[:, cake], '-', linewidth=3)
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
         plt.ylabel('Intensity', fontsize=label_size)
         plt.xlim(x_min, x_max)
         plt.tight_layout()
 
-    def fit_peaks(self, peak_params: List[PeakParams]):
+    def fit_peaks(self, cakes: Union[int, List[int]],
+                  peak_params: Union[PeakParams, List[PeakParams]]):
         """Attempt to fit peaks within the ranges specified by `peak_ranges`.
         :param peak_params: A list of PeakParams describing the peaks to be fitted.
+        :param cakes: Which cakes to fit.
         """
-        if self.spectral_data is not None:
-            self.fitted_peaks = []
-            if isinstance(peak_params, PeakParams):
-                peak_params = [peak_params]
-            for peak in peak_params:
-                new_fit = PeakFit(peak.name)
-                new_fit.raw_spectrum = self.get_spectrum_subset(ttheta_lims=peak.range)
-                fit_results, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
-                new_fit.result = fit_results
-                # Transpose the array to get appropriate row/column order.
-                new_fit.points = np.array(fit_line).T
-                self.fitted_peaks.append(new_fit)
-        else:
-            print("No spectrum loaded, use load_single_spectrum or load_merged_spectrum "
-                  "methods to load data from a file.")
+        self.fitted_peaks = []
+        if isinstance(peak_params, PeakParams):
+            peak_params = [peak_params]
+        for peak in peak_params:
+            new_fit = PeakFit(peak.name)
+            new_fit.raw_spectrum = self.get_spectrum_subset(two_theta_lims=peak.range, cakes=cakes)
+            fit_results, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
+            new_fit.result = fit_results
+            # Transpose the array to get appropriate row/column order.
+            new_fit.points = np.array(fit_line).T
+            self.fitted_peaks.append(new_fit)
+        print("Fitting complete.")
 
-    def get_spectrum_subset(self, ttheta_lims=(0, 10)):
+    def get_spectrum_subset(self, cakes: Union[int, List[int]], two_theta_lims=(0, 10)):
         """Return spectral intensity as a function of 2-theta for a selected 2-theta range.
         peak."""
-        mask = np.logical_and(self.spectral_data[:, 0] > ttheta_lims[0],
-                              self.spectral_data[:, 0] < ttheta_lims[1])
-        return self.spectral_data[mask]
+        mask = np.logical_and(self.spectral_data[:, 0] > two_theta_lims[0],
+                              self.spectral_data[:, 0] < two_theta_lims[1])
+        if cakes:
+            if isinstance(cakes, int):
+                cakes = [cakes]
+            cakes.insert(0, 0)
+            return self.spectral_data[np.ix_(mask, cakes)]
+        else:
+            return self.spectral_data[mask, :]
 
     def get_fit(self, name: str):
         """Get a peak fit by name."""
