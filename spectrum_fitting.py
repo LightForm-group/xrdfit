@@ -52,12 +52,14 @@ class PeakFit:
     :ivar name: The name of the peak.
     :ivar raw_spectrum: The raw data to which the fit is made.
     :ivar points: The fit evaluated over the range of raw_spectrum.
-    :ivar result: The lmfit result of the fit."""
+    :ivar result: The lmfit result of the fit.
+    :ivar cake_numbers: The cake number each column in raw_spectrum refers to."""
     def __init__(self, name: str):
         self.name = name
         self.raw_spectrum = None
         self.points = None
         self.result = None
+        self.cake_numbers = None
 
     def plot(self):
         """ Plot the raw spectral data and the fit."""
@@ -72,17 +74,14 @@ class PeakFit:
             plt.tight_layout()
             plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
             plt.ylabel('Intensity', fontsize=label_size)
-            plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, 1], 'b+', ms=15, mew=3,
-                     label="Spectrum")
+            for index, cake_num in enumerate(self.cake_numbers):
+                plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, index + 1], '+', ms=15,
+                         mew=3, label="Cake {}".format(cake_num))
             plt.plot(self.points[:, 0], self.points[:, 1], 'k--', lw=1, label="Fit")
             plt.legend()
             plt.title(self.name, fontsize=label_size)
             plt.tight_layout()
-
-
-def line(x, constBG):
-    """constant Background"""
-    return constBG
+            plt.show()
 
 
 def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
@@ -109,19 +108,17 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
 
         # Add the fit parameters for the peak
         parameters = model.guess(intensity, x=ttheta)
-        if peak_params[index].center:
-            parameters['{}center'.format(peak_prefix)].set(peak_params[index].center,
-                                                           min=peak_params[index].center_min,
-                                                           max=peak_params[index].center_max)
-        parameters['{}sigma'.format(peak_prefix)].set(min=peak_params[index].sigma_min,
-                                                      max=peak_params[index].sigma_max)
-        parameters['{}amplitude'.format(peak_prefix)].set(min=peak_params[index].amplitude_min)
+        if peak.center:
+            parameters['{}center'.format(peak_prefix)].set(peak.center, min=peak.center_min,
+                                                           max=peak.center_max)
+        parameters['{}sigma'.format(peak_prefix)].set(min=peak.sigma_min, max=peak.sigma_max)
+        parameters['{}amplitude'.format(peak_prefix)].set(min=peak.amplitude_min)
         if combined_parameters:
             combined_parameters += parameters
         else:
             combined_parameters = parameters
-    combined_model += Model(line)
-    combined_parameters.add("constBG", 0)
+    combined_model += Model(lambda constant_background: constant_background)
+    combined_parameters.add("constant_background", 0)
 
     fit_results = combined_model.fit(intensity, combined_parameters, x=ttheta)
     fit_x_data = np.linspace(ttheta[0], ttheta[-1], 100)
@@ -223,8 +220,13 @@ class FitSpectrum:
         for peak in peak_params:
             new_fit = PeakFit(peak.name)
             new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.range, merge_cakes)
-            fit_results, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
-            new_fit.result = fit_results
+            if merge_cakes:
+                new_fit.cake_numbers = [" + ".join(map(str, cakes))]
+                new_fit.result, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
+            else:
+                new_fit.cake_numbers = list(map(str, cakes))
+                stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
+                new_fit.result, fit_line = do_pv_fit(stacked_spectrum, peak.maxima)
             # Transpose the array to get appropriate row/column order.
             new_fit.points = np.array(fit_line).T
             self.fitted_peaks.append(new_fit)
@@ -259,3 +261,15 @@ class FitSpectrum:
             if fit.name == name:
                 return fit
         return None
+
+
+def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
+    """Take an number of observations from N different cakes and stack them vertically into a 2
+    column wide array"""
+    stacked_data = spectrum[:, 0:2]
+    spectrum_columns = spectrum.shape[1]
+    for column_num in range(2, spectrum_columns):
+        stacked_data = np.vstack(
+            (stacked_data, spectrum[np.ix_([True] * spectrum.shape[0], [0, column_num])]))
+    stacked_data = stacked_data[stacked_data[:, 0].argsort()]
+    return stacked_data
