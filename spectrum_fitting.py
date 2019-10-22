@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
 from lmfit import Model
 
-import averaging_angles
-
 
 class MaximumParams:
     """An object containing fitting details of a single maximum within a peak."""
@@ -142,33 +140,30 @@ class FitSpectrum:
         self.fitted_peaks = []
         self.first_cake_angle = first_cake_angle
 
-    def get_merged_cakes(self, cakes_to_merge: List[int]) -> np.ndarray:
-        return np.sum(self.spectral_data[:, cakes_to_merge], axis=1)
-
     def plot_polar(self):
         """Plot the whole diffraction pattern on polar axes."""
         with np.errstate(divide='ignore'):
-            z = np.log10(self.spectral_data[:, 1:])
+            z_data = np.log10(self.spectral_data[:, 1:])
         rad = self.spectral_data[:, 0]
-        num_cakes = z.shape[1]
-        self._plot_polar_heatmap(num_cakes, rad, z)
+        num_cakes = z_data.shape[1]
+        self._plot_polar_heatmap(num_cakes, rad, z_data)
 
     def highlight_cakes(self, cakes: Union[int, List[int]]):
         """Plot a circular map of the cakes with the selected cakes highlighted."""
         num_cakes = self.spectral_data.shape[1] - 1
-        z = np.zeros((1, self.spectral_data.shape[1] - 1))
+        z_data = np.zeros((1, self.spectral_data.shape[1] - 1))
         for cake_num in cakes:
-            z[0, cake_num - 1] = 1
+            z_data[0, cake_num - 1] = 1
         rad = [0, 1]
-        self._plot_polar_heatmap(num_cakes, rad, z)
+        self._plot_polar_heatmap(num_cakes, rad, z_data)
 
-    def _plot_polar_heatmap(self, num_cakes, rad, z):
+    def _plot_polar_heatmap(self, num_cakes, rad, z_data):
         """A method for plotting a polar heatmap."""
         azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
-        r, th = np.meshgrid(rad, azm)
+        r, theta = np.meshgrid(rad, azm)
         plt.subplot(projection="polar", theta_direction=-1,
                     theta_offset=np.deg2rad(360 / num_cakes / 2))
-        plt.pcolormesh(th, r, z.T)
+        plt.pcolormesh(theta, r, z_data.T)
         plt.plot(azm, r, ls='none')
         plt.grid()
         # Turn on theta grid lines at the cake edges
@@ -192,8 +187,8 @@ class FitSpectrum:
         # Plot the data
         plt.figure(figsize=(8, 6))
         if merge_cakes:
-            data = self.get_merged_cakes(cakes_to_plot)
-            plt.plot(self.spectral_data[:, 0], data, '-', linewidth=2)
+            data = self.get_spectrum_subset(cakes_to_plot, (x_min, x_max), True)
+            plt.plot(data[:, 0], data[:, 1:], '-', linewidth=2)
         else:
             for cake_num in cakes_to_plot:
                 plt.plot(self.spectral_data[:, 0], self.spectral_data[:, cake_num], '-',
@@ -209,19 +204,25 @@ class FitSpectrum:
         plt.ylabel('Intensity', fontsize=label_size)
         plt.xlim(x_min, x_max)
         plt.tight_layout()
+        plt.show()
 
     def fit_peaks(self, cakes: Union[int, List[int]],
-                  peak_params: Union[PeakParams, List[PeakParams]]):
+                  peak_params: Union[PeakParams, List[PeakParams]], merge_cakes: bool = False):
         """Attempt to fit peaks within the ranges specified by `peak_ranges`.
         :param peak_params: A list of PeakParams describing the peaks to be fitted.
         :param cakes: Which cakes to fit.
+        :param merge_cakes: If True and multiple cakes are specified then sum the cakes before
+        fitting. Else do the fit to multiple cakes simultaneously.
         """
         self.fitted_peaks = []
+        if isinstance(cakes, int):
+            cakes = [cakes]
         if isinstance(peak_params, PeakParams):
             peak_params = [peak_params]
+
         for peak in peak_params:
             new_fit = PeakFit(peak.name)
-            new_fit.raw_spectrum = self.get_spectrum_subset(two_theta_lims=peak.range, cakes=cakes)
+            new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.range, merge_cakes)
             fit_results, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
             new_fit.result = fit_results
             # Transpose the array to get appropriate row/column order.
@@ -230,18 +231,27 @@ class FitSpectrum:
         print("Fitting complete.")
 
     def get_spectrum_subset(self, cakes: Union[int, List[int]],
-                            two_theta_lims: Tuple[int, int] = (0, 10)) -> np.ndarray:
+                            two_theta_lims: Tuple[float, float],
+                            merge_cakes: bool) -> np.ndarray:
         """Return spectral intensity as a function of 2-theta for a selected 2-theta range.
-        peak."""
-        mask = np.logical_and(self.spectral_data[:, 0] > two_theta_lims[0],
-                              self.spectral_data[:, 0] < two_theta_lims[1])
-        if cakes:
-            if isinstance(cakes, int):
-                cakes = [cakes]
-            cakes.insert(0, 0)
-            return self.spectral_data[np.ix_(mask, cakes)]
+        :param cakes: One or more cakes to get the intensity for.
+        :param two_theta_lims: Limits to the two-theta values returned.
+        :param merge_cakes: If more than one cake and True, sum the values of all of the cakes
+        else return one column for each cake."""
+        if isinstance(cakes, int):
+            cakes = [cakes]
+
+        theta_mask = np.logical_and(self.spectral_data[:, 0] > two_theta_lims[0],
+                                    self.spectral_data[:, 0] < two_theta_lims[1])
+        if merge_cakes:
+            # Returns 2 columns, the two-theta angles and the summed intensity
+            data = np.sum(self.spectral_data[:, cakes], axis=1)
+            data = np.vstack((self.spectral_data[:, 0], data)).T
+            return data[theta_mask, :]
         else:
-            return self.spectral_data[mask, :]
+            # Returns an array with one column for the two-theta values and one column for each cake
+            chosen_cakes = [0] + cakes
+            return self.spectral_data[np.ix_(theta_mask, chosen_cakes)]
 
     def get_fit(self, name: str):
         """Get a peak fit by name."""
