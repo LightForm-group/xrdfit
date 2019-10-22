@@ -136,23 +136,14 @@ class FitSpectrum:
     :ivar spectral_data: (NumPy array) A numpy array containing the whole diffraction pattern.
     :ivar fitted_peaks: List[Lmfit result] Fits to the peaks in the spectrum.
     """
-    def __init__(self, file_path):
+    def __init__(self, file_path: str, first_cake_angle: int = 90):
         self.spectral_data = np.loadtxt(file_path)
         print("Diffraction pattern successfully loaded from file.")
         self.fitted_peaks = []
+        self.first_cake_angle = first_cake_angle
 
-    def load_merged_spectrum(self, file_path: str, starting_angle: int, averaging_type: str,
-                             num_cakes_to_average: int = 3):
-        data = np.loadtxt(file_path)
-        num_total_cakes = data.shape[1] - 1
-
-        cakes_to_average = averaging_angles.get_cakes_to_average(averaging_type, num_total_cakes,
-                                                                 starting_angle,
-                                                                 num_cakes_to_average)
-        if cakes_to_average:
-            spectral_data = np.sum(data[:, cakes_to_average], axis=1)
-            self.spectral_data = np.vstack((data[:, 0], spectral_data)).T
-            print("Spectrum successfully loaded from file.")
+    def get_merged_cakes(self, cakes_to_merge: List[int]) -> np.ndarray:
+        return np.sum(self.spectral_data[:, cakes_to_merge], axis=1)
 
     def plot_polar(self):
         """Plot the whole diffraction pattern on polar axes."""
@@ -163,7 +154,7 @@ class FitSpectrum:
         azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
         r, th = np.meshgrid(rad, azm)
 
-        plt.subplot(projection="polar", theta_direction=-1, theta_offset=np.deg2rad(5))
+        plt.subplot(projection="polar", theta_direction=-1, theta_offset=np.deg2rad(360/num_cakes/2))
         plt.pcolormesh(th, r, z.T)
         plt.plot(azm, r, ls='none')
         plt.grid()
@@ -175,19 +166,59 @@ class FitSpectrum:
         ax = plt.gca()
         trans, _, _ = ax.get_xaxis_text1_transform(0)
         for label in range(1, num_cakes + 1):
-            ax.text(np.deg2rad(label * 10 - 5), -0.1, label, transform=trans, rotation=0,
-                    ha="center", va="center")
+            ax.text(np.deg2rad(label * 10 - 95 + self.first_cake_angle), -0.1, label,
+                    transform=trans, rotation=0, ha="center", va="center")
 
         plt.show()
 
-    def plot(self, cake, x_min=0, x_max=10):
+    def highlight_cakes(self, cakes: Union[int, List[int]]):
+        num_cakes = self.spectral_data.shape[1] - 1
+        z = np.zeros((1, self.spectral_data.shape[1] - 1))
+        for cake_num in cakes:
+            z[0, cake_num - 1] = 1
+        rad = [0, 1]
+        azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
+        r, th = np.meshgrid(rad, azm)
+
+        plt.subplot(projection="polar", theta_direction=-1, theta_offset=np.deg2rad(360/num_cakes/2))
+        plt.pcolormesh(th, r, z.T)
+        plt.plot(azm, r, ls='none')
+        plt.grid()
+        # Turn on theta grid lines at the cake edges
+        plt.thetagrids([theta * 360 / num_cakes for theta in range(num_cakes)], labels=[])
+        # Turn off radial grid lines
+        plt.rgrids([])
+        # Put the cake numbers in the right places
+        ax = plt.gca()
+        trans, _, _ = ax.get_xaxis_text1_transform(0)
+        for label in range(1, num_cakes + 1):
+            ax.text(np.deg2rad(label * 10 - 95 + self.first_cake_angle), -0.1, label,
+                    transform=trans, rotation=0, ha="center", va="center")
+
+        plt.show()
+
+    def plot(self, cakes_to_plot: Union[int, List[int]], x_min: float = 0, x_max: float = 10,
+             merge_cakes: bool = False):
         """Plot the intensity as a function of two theta for a given cake."""
+        if isinstance(cakes_to_plot, int):
+            cakes_to_plot = [cakes_to_plot]
+
+        # Plot the data
         plt.figure(figsize=(8, 6))
+        if merge_cakes:
+            data = self.get_merged_cakes(cakes_to_plot)
+            plt.plot(self.spectral_data[:, 0], data, '-', linewidth=2)
+        else:
+            for cake_num in cakes_to_plot:
+                plt.plot(self.spectral_data[:, 0], self.spectral_data[:, cake_num], '-',
+                         linewidth=2, label=cake_num)
+                plt.legend()
+
+        # Plot formatting
         label_size = 20
         plt.minorticks_on()
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
-        plt.plot(self.spectral_data[:, 0], self.spectral_data[:, cake], '-', linewidth=3)
         plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
         plt.ylabel('Intensity', fontsize=label_size)
         plt.xlim(x_min, x_max)
