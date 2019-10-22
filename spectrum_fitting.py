@@ -151,36 +151,23 @@ class FitSpectrum:
             z = np.log10(self.spectral_data[:, 1:])
         rad = self.spectral_data[:, 0]
         num_cakes = z.shape[1]
-        azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
-        r, th = np.meshgrid(rad, azm)
-
-        plt.subplot(projection="polar", theta_direction=-1, theta_offset=np.deg2rad(360/num_cakes/2))
-        plt.pcolormesh(th, r, z.T)
-        plt.plot(azm, r, ls='none')
-        plt.grid()
-        # Turn on theta grid lines at the cake edges
-        plt.thetagrids([theta * 360 / num_cakes for theta in range(num_cakes)], labels=[])
-        # Turn off radial grid lines
-        plt.rgrids([])
-        # Put the cake numbers in the right places
-        ax = plt.gca()
-        trans, _, _ = ax.get_xaxis_text1_transform(0)
-        for label in range(1, num_cakes + 1):
-            ax.text(np.deg2rad(label * 10 - 95 + self.first_cake_angle), -0.1, label,
-                    transform=trans, rotation=0, ha="center", va="center")
-
-        plt.show()
+        self._plot_polar_heatmap(num_cakes, rad, z)
 
     def highlight_cakes(self, cakes: Union[int, List[int]]):
+        """Plot a circular map of the cakes with the selected cakes highlighted."""
         num_cakes = self.spectral_data.shape[1] - 1
         z = np.zeros((1, self.spectral_data.shape[1] - 1))
         for cake_num in cakes:
             z[0, cake_num - 1] = 1
         rad = [0, 1]
+        self._plot_polar_heatmap(num_cakes, rad, z)
+
+    def _plot_polar_heatmap(self, num_cakes, rad, z):
+        """A method for plotting a polar heatmap."""
         azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
         r, th = np.meshgrid(rad, azm)
-
-        plt.subplot(projection="polar", theta_direction=-1, theta_offset=np.deg2rad(360/num_cakes/2))
+        plt.subplot(projection="polar", theta_direction=-1,
+                    theta_offset=np.deg2rad(360 / num_cakes / 2))
         plt.pcolormesh(th, r, z.T)
         plt.plot(azm, r, ls='none')
         plt.grid()
@@ -194,7 +181,6 @@ class FitSpectrum:
         for label in range(1, num_cakes + 1):
             ax.text(np.deg2rad(label * 10 - 95 + self.first_cake_angle), -0.1, label,
                     transform=trans, rotation=0, ha="center", va="center")
-
         plt.show()
 
     def plot(self, cakes_to_plot: Union[int, List[int]], x_min: float = 0, x_max: float = 10,
@@ -243,7 +229,8 @@ class FitSpectrum:
             self.fitted_peaks.append(new_fit)
         print("Fitting complete.")
 
-    def get_spectrum_subset(self, cakes: Union[int, List[int]], two_theta_lims=(0, 10)):
+    def get_spectrum_subset(self, cakes: Union[int, List[int]],
+                            two_theta_lims: Tuple[int, int] = (0, 10)) -> np.ndarray:
         """Return spectral intensity as a function of 2-theta for a selected 2-theta range.
         peak."""
         mask = np.logical_and(self.spectral_data[:, 0] > two_theta_lims[0],
