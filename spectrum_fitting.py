@@ -2,10 +2,15 @@ import glob
 from typing import List, Tuple, Union
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
-from lmfit.models import PseudoVoigtModel
-from lmfit import Model
+import lmfit
 from tqdm import tqdm
+
+matplotlib.rc('xtick', labelsize=14)
+matplotlib.rc('ytick', labelsize=14)
+matplotlib.rc('axes', titlesize=20)
+matplotlib.rc('axes', labelsize=20)
 
 
 class MaximumParams:
@@ -69,19 +74,16 @@ class PeakFit:
             print("Cannot plot fit peak as fitting has not been done yet.")
         else:
             plt.figure(figsize=(8, 6))
-            label_size = 20
             plt.minorticks_on()
-            plt.xticks(fontsize=14)
-            plt.yticks(fontsize=14)
             plt.tight_layout()
-            plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
-            plt.ylabel('Intensity', fontsize=label_size)
+            plt.xlabel(r'Two Theta ($^\circ$)')
+            plt.ylabel('Intensity')
             for index, cake_num in enumerate(self.cake_numbers):
                 plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, index + 1], '+', ms=15,
                          mew=3, label="Cake {}".format(cake_num))
             plt.plot(self.points[:, 0], self.points[:, 1], 'k--', lw=1, label="Fit")
             plt.legend()
-            plt.title(self.name, fontsize=label_size)
+            plt.title(self.name)
             plt.tight_layout()
             plt.show()
 
@@ -102,7 +104,7 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
     for index, peak in enumerate(peak_params):
         # Add the peak to the model
         peak_prefix = "peak_{}_".format(index + 1)
-        model = PseudoVoigtModel(prefix=peak_prefix)
+        model = lmfit.models.PseudoVoigtModel(prefix=peak_prefix)
         if combined_model:
             combined_model += model
         else:
@@ -119,7 +121,7 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
             combined_parameters += parameters
         else:
             combined_parameters = parameters
-    combined_model += Model(lambda constant_background: constant_background)
+    combined_model += lmfit.Model(lambda constant_background: constant_background)
     combined_parameters.add("constant_background", 0)
 
     fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta)
@@ -198,12 +200,9 @@ class FitSpectrum:
                 plt.legend()
 
         # Plot formatting
-        label_size = 20
         plt.minorticks_on()
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
-        plt.xlabel(r'Two Theta ($^\circ$)', fontsize=label_size)
-        plt.ylabel('Intensity', fontsize=label_size)
+        plt.xlabel(r'Two Theta ($^\circ$)')
+        plt.ylabel('Intensity')
         plt.xlim(x_min, x_max)
         plt.tight_layout()
         plt.show()
@@ -261,7 +260,7 @@ class FitSpectrum:
             chosen_cakes = [0] + cakes
             return self.spectral_data[np.ix_(theta_mask, chosen_cakes)]
 
-    def get_fit(self, name: str):
+    def get_fit(self, name: str) -> Union[lmfit.model.ModelResult, None]:
         """Get a peak fit by name."""
         for fit in self.fitted_peaks:
             if fit.name == name:
@@ -271,11 +270,14 @@ class FitSpectrum:
 
 class FittingExperiment:
     def __init__(self, frame_time: int, file_stub: str, first_cake_angle: int,
-                 cakes_to_fit: List[int], peak_params: List[PeakParams], merge_cakes: bool):
+                 cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
+                 merge_cakes: bool):
         self.frame_time = frame_time
         self.file_stub = file_stub
         self.first_cake_angle = first_cake_angle
         self.cakes_to_fit = cakes_to_fit
+        if isinstance(peak_params, PeakParams):
+            peak_params = [peak_params]
         self.peak_params = peak_params
         self.merge_cakes = merge_cakes
 
@@ -289,6 +291,23 @@ class FittingExperiment:
             spectral_data.fit_peaks(self.cakes_to_fit, self.peak_params, self.merge_cakes)
             self.spectra_fits.append(spectral_data)
         print("Analysis complete.")
+
+    def list_fits(self) -> List[str]:
+        return [peak.name for peak in self.peak_params]
+
+    def plot_fit_property(self, peak_name: str, fit_property: str):
+        if peak_name in [peak.name for peak in self.peak_params]:
+            peak_heights = []
+            for timestep in self.spectra_fits:
+                peak_fit = timestep.get_fit(peak_name)
+                peak_heights.append(
+                    peak_fit.result.params["peak_{}_{}".format(peak_name, fit_property)])
+            plt.plot((np.arange(len(peak_heights)) + 1) * self.frame_time, peak_heights)
+            plt.xlabel("Time (s)")
+            plt.ylabel("Peak {}".format(fit_property))
+            plt.show()
+        else:
+            print("Peak '{}' not found in fitted peaks.")
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
