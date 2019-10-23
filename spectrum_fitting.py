@@ -1,3 +1,4 @@
+import glob
 from typing import List, Tuple, Union
 
 import numpy as np
@@ -261,6 +262,26 @@ class FitSpectrum:
             if fit.name == name:
                 return fit
         return None
+
+
+class FittingExperiment:
+    def __init__(self, frame_time: int, file_stub: str, first_cake_angle: int,
+                 cakes_to_fit: List[int], peak_params: List[PeakParams], merge_cakes: bool):
+        self.frame_time = frame_time
+        self.file_stub = file_stub
+        self.first_cake_angle = first_cake_angle
+        self.cakes_to_fit = cakes_to_fit
+        self.peak_params = peak_params
+        self.merge_cakes = merge_cakes
+
+        self.spectra_fits = []
+
+    def run_analysis(self):
+        file_list = sorted(glob.glob(self.file_stub))
+        for file_path in file_list:
+            spectral_data = FitSpectrum(file_path, self.first_cake_angle)
+            spectral_data.fit_peaks(self.cakes_to_fit, self.peak_params, self.merge_cakes)
+            self.spectra_fits.append(spectral_data)
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
