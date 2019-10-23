@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from lmfit.models import PseudoVoigtModel
 from lmfit import Model
+from tqdm import tqdm
 
 
 class MaximumParams:
@@ -92,7 +93,7 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
     (amplitude, fwhm, etc.) and the fit line calculated using the fit parameters and
     100x two-theta points.
     """
-    ttheta = peak_data[:, 0]
+    two_theta = peak_data[:, 0]
     intensity = peak_data[:, 1]
 
     combined_model = None
@@ -108,7 +109,7 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
             combined_model = model
 
         # Add the fit parameters for the peak
-        parameters = model.guess(intensity, x=ttheta)
+        parameters = model.guess(intensity, x=two_theta)
         if peak.center:
             parameters['{}center'.format(peak_prefix)].set(peak.center, min=peak.center_min,
                                                            max=peak.center_max)
@@ -121,8 +122,8 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
     combined_model += Model(lambda constant_background: constant_background)
     combined_parameters.add("constant_background", 0)
 
-    fit_results = combined_model.fit(intensity, combined_parameters, x=ttheta)
-    fit_x_data = np.linspace(ttheta[0], ttheta[-1], 100)
+    fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta)
+    fit_x_data = np.linspace(two_theta[0], two_theta[-1], 100)
     fit_line = [fit_x_data, combined_model.eval(fit_results.params, x=fit_x_data)]
     return fit_results, fit_line
 
@@ -132,11 +133,14 @@ class FitSpectrum:
     :ivar spectral_data: (NumPy array) A numpy array containing the whole diffraction pattern.
     :ivar fitted_peaks: List[Lmfit result] Fits to the peaks in the spectrum.
     """
-    def __init__(self, file_path: str, first_cake_angle: int = 90):
-        self.spectral_data = np.loadtxt(file_path)
-        print("Diffraction pattern successfully loaded from file.")
-        self.fitted_peaks = []
+    def __init__(self, file_path: str, first_cake_angle: int = 90, verbose: bool = True):
+        self.verbose = verbose
         self.first_cake_angle = first_cake_angle
+        self.fitted_peaks = []
+
+        self.spectral_data = np.loadtxt(file_path)
+        if self.verbose:
+            print("Diffraction pattern successfully loaded from file.")
 
     def plot_polar(self):
         """Plot the whole diffraction pattern on polar axes."""
@@ -231,7 +235,8 @@ class FitSpectrum:
             # Transpose the array to get appropriate row/column order.
             new_fit.points = np.array(fit_line).T
             self.fitted_peaks.append(new_fit)
-        print("Fitting complete.")
+        if self.verbose:
+            print("Fitting complete.")
 
     def get_spectrum_subset(self, cakes: Union[int, List[int]],
                             two_theta_lims: Tuple[float, float],
@@ -278,10 +283,12 @@ class FittingExperiment:
 
     def run_analysis(self):
         file_list = sorted(glob.glob(self.file_stub))
-        for file_path in file_list:
-            spectral_data = FitSpectrum(file_path, self.first_cake_angle)
+        print("Processing {} diffusion patterns.".format(len(file_list)))
+        for file_path in tqdm(file_list):
+            spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
             spectral_data.fit_peaks(self.cakes_to_fit, self.peak_params, self.merge_cakes)
             self.spectra_fits.append(spectral_data)
+        print("Analysis complete.")
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
