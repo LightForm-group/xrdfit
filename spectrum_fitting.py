@@ -15,8 +15,9 @@ matplotlib.rc('axes', labelsize=20)
 
 class MaximumParams:
     """An object containing fitting details of a single maximum within a peak."""
-    def __init__(self, peak_center=None, center_min=None, center_max=None, sigma_min=None,
-                 sigma_max=None, amplitude_min=None):
+    def __init__(self, peak_center: float = None, center_min: float = None,
+                 center_max: float = None, sigma_min: float = None,
+                 sigma_max: float = None, amplitude_min: float = None):
         """
         :param peak_center: The approximate center of the peak.
         :param center_min: The minimum bound for the center of the peak.
@@ -63,10 +64,10 @@ class PeakFit:
     :ivar cake_numbers: The cake number each column in raw_spectrum refers to."""
     def __init__(self, name: str):
         self.name = name
-        self.raw_spectrum = None
-        self.points = None
-        self.result = None
-        self.cake_numbers = None
+        self.raw_spectrum: Union[None, np.ndarray] = None
+        self.points: Union[None, np.ndarray] = None
+        self.result: Union[None, lmfit.model.ModelResult] = None
+        self.cake_numbers: List[int] = []
 
     def plot(self):
         """ Plot the raw spectral data and the fit."""
@@ -88,7 +89,7 @@ class PeakFit:
             plt.show()
 
 
-def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
+def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
     """
     Pseudo-Voigt fit to the lattice plane peak intensity.
     Return results of the fit as an lmfit class, which contains the fitted parameters
@@ -132,15 +133,18 @@ def do_pv_fit(peak_data, peak_params: List[MaximumParams]):
 
 class FitSpectrum:
     """An object that handles fitting peaks in a spectrum.
-    :ivar spectral_data: (NumPy array) A numpy array containing the whole diffraction pattern.
-    :ivar fitted_peaks: List[Lmfit result] Fits to the peaks in the spectrum.
+    :ivar verbose: Whether or not to print fit status to the console.
+    :ivar first_cake_angle: The angle of the first cake in the data file in degrees
+    clockwise from North.
+    :ivar spectral_data: Data for the whole diffraction pattern.
+    :ivar fitted_peaks: Fits to peaks in the spectrum.
     """
     def __init__(self, file_path: str, first_cake_angle: int = 90, verbose: bool = True):
         self.verbose = verbose
         self.first_cake_angle = first_cake_angle
-        self.fitted_peaks = []
+        self.fitted_peaks: List[PeakFit] = []
 
-        self.spectral_data = np.loadtxt(file_path)
+        self.spectral_data: np.ndarray = np.loadtxt(file_path)
         if self.verbose:
             print("Diffraction pattern successfully loaded from file.")
 
@@ -260,7 +264,7 @@ class FitSpectrum:
             chosen_cakes = [0] + cakes
             return self.spectral_data[np.ix_(theta_mask, chosen_cakes)]
 
-    def get_fit(self, name: str) -> Union[lmfit.model.ModelResult, None]:
+    def get_fit(self, name: str) -> Union[PeakFit, None]:
         """Get a peak fit by name."""
         for fit in self.fitted_peaks:
             if fit.name == name:
@@ -269,6 +273,10 @@ class FitSpectrum:
 
 
 class FittingExperiment:
+    """Information about a series of fits to temporally spaced diffraction patterns.
+    :ivar frame_time: Time between subsequent diffraction patterns.
+    :ivar file_stub: String used to glob for the diffraction patterns.
+    :ivar first_cake_angle:"""
     def __init__(self, frame_time: int, file_stub: str, first_cake_angle: int,
                  cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
                  merge_cakes: bool):
@@ -284,6 +292,7 @@ class FittingExperiment:
         self.spectra_fits = []
 
     def run_analysis(self):
+        """Iterate a fit over multiple diffusion patterns."""
         file_list = sorted(glob.glob(self.file_stub))
         print("Processing {} diffusion patterns.".format(len(file_list)))
         for file_path in tqdm(file_list):
@@ -293,18 +302,23 @@ class FittingExperiment:
         print("Analysis complete.")
 
     def list_fits(self) -> List[str]:
+        """List the peaks that have been fitted."""
         return [peak.name for peak in self.peak_params]
 
-    def plot_fit_property(self, peak_name: str, fit_property: str):
+    def plot_fit_parameter(self, peak_name: str, fit_parameter: str):
+        """Plot a named parameter of a fit as a function of time.
+        :param peak_name: The name of the fit to plot.
+        :param fit_parameter: The name of the fit parameter to plot.
+        """
         if peak_name in [peak.name for peak in self.peak_params]:
             peak_heights = []
             for timestep in self.spectra_fits:
                 peak_fit = timestep.get_fit(peak_name)
                 peak_heights.append(
-                    peak_fit.result.params["peak_{}_{}".format(peak_name, fit_property)])
+                    peak_fit.result.params["peak_{}_{}".format(peak_name, fit_parameter)])
             plt.plot((np.arange(len(peak_heights)) + 1) * self.frame_time, peak_heights)
             plt.xlabel("Time (s)")
-            plt.ylabel("Peak {}".format(fit_property))
+            plt.ylabel("Peak {}".format(fit_parameter))
             plt.show()
         else:
             print("Peak '{}' not found in fitted peaks.")
