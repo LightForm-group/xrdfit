@@ -6,6 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import lmfit
 from tqdm import tqdm
+import pandas as pd
 
 matplotlib.rc('xtick', labelsize=14)
 matplotlib.rc('ytick', labelsize=14)
@@ -142,7 +143,7 @@ class FitSpectrum:
         self.first_cake_angle = first_cake_angle
         self.fitted_peaks: List[PeakFit] = []
 
-        self.spectral_data: np.ndarray = np.loadtxt(file_path)
+        self.spectral_data: np.ndarray = pd.read_table(file_path).to_numpy
         if self.verbose:
             print("Diffraction pattern successfully loaded from file.")
 

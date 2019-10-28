@@ -5,3 +5,4 @@ __pycache__/
 *.fuse
 /.idea
 /venv
+/example_data/adc_041_7Nb
