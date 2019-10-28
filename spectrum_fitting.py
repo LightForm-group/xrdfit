@@ -143,7 +143,7 @@ class FitSpectrum:
         self.first_cake_angle = first_cake_angle
         self.fitted_peaks: List[PeakFit] = []
 
-        self.spectral_data: np.ndarray = pd.read_table(file_path).to_numpy
+        self.spectral_data = pd.read_table(file_path).to_numpy()
         if self.verbose:
             print("Diffraction pattern successfully loaded from file.")
 
@@ -274,23 +274,28 @@ class FittingExperiment:
     :ivar frame_time: Time between subsequent diffraction patterns.
     :ivar file_stub: String used to glob for the diffraction patterns.
     :ivar first_cake_angle:"""
-    def __init__(self, frame_time: int, file_stub: str, first_cake_angle: int,
+    def __init__(self, frame_time: int, file_string: str, first_cake_angle: int,
                  cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
-                 merge_cakes: bool):
+                 merge_cakes: bool, frames_to_load: List[int] = None):
         self.frame_time = frame_time
-        self.file_stub = file_stub
+        self.file_string = file_string
         self.first_cake_angle = first_cake_angle
         self.cakes_to_fit = cakes_to_fit
         if isinstance(peak_params, PeakParams):
             peak_params = [peak_params]
         self.peak_params = peak_params
         self.merge_cakes = merge_cakes
+        self.frames_to_load = frames_to_load
 
         self.spectra_fits = []
 
     def run_analysis(self):
         """Iterate a fit over multiple diffusion patterns."""
-        file_list = sorted(glob.glob(self.file_stub))
+        if self.frames_to_load:
+            file_list = [self.file_string.format(number) for number in self.frames_to_load]
+        else:
+            file_list = sorted(glob.glob(self.file_string))
+
         print("Processing {} diffusion patterns.".format(len(file_list)))
         iteration_peak_params = self.peak_params
         for file_path in tqdm(file_list):
