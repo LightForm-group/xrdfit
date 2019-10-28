@@ -59,17 +59,15 @@ class PeakFit:
     """An object containing data on the fit to a peak.
     :ivar name: The name of the peak.
     :ivar raw_spectrum: The raw data to which the fit is made.
-    :ivar points: The fit evaluated over the range of raw_spectrum.
     :ivar result: The lmfit result of the fit.
     :ivar cake_numbers: The cake number each column in raw_spectrum refers to."""
     def __init__(self, name: str):
         self.name = name
         self.raw_spectrum: Union[None, np.ndarray] = None
-        self.points: Union[None, np.ndarray] = None
         self.result: Union[None, lmfit.model.ModelResult] = None
         self.cake_numbers: List[int] = []
 
-    def plot(self):
+    def plot(self, num_fit_points=100):
         """ Plot the raw spectral data and the fit."""
         if self.raw_spectrum is None:
             print("Cannot plot fit peak as fitting has not been done yet.")
@@ -82,7 +80,9 @@ class PeakFit:
             for index, cake_num in enumerate(self.cake_numbers):
                 plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, index + 1], '+', ms=15,
                          mew=3, label="Cake {}".format(cake_num))
-            plt.plot(self.points[:, 0], self.points[:, 1], 'k--', lw=1, label="Fit")
+            x_data = np.linspace(np.min(self.raw_spectrum[:, 0]), np.max(self.raw_spectrum[:, 0]), num_fit_points)
+            y_fit = self.result.model.eval(self.result.params, x=x_data)
+            plt.plot(x_data, y_fit, 'k--', lw=1, label="Fit")
             plt.legend()
             plt.title(self.name)
             plt.tight_layout()
@@ -126,9 +126,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
     combined_parameters.add("constant_background", 0)
 
     fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta)
-    fit_x_data = np.linspace(two_theta[0], two_theta[-1], 100)
-    fit_line = [fit_x_data, combined_model.eval(fit_results.params, x=fit_x_data)]
-    return fit_results, fit_line
+    return fit_results
 
 
 class FitSpectrum:
@@ -230,13 +228,11 @@ class FitSpectrum:
             new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.range, merge_cakes)
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
-                new_fit.result, fit_line = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
+                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
             else:
                 new_fit.cake_numbers = list(map(str, cakes))
                 stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
-                new_fit.result, fit_line = do_pv_fit(stacked_spectrum, peak.maxima)
-            # Transpose the array to get appropriate row/column order.
-            new_fit.points = np.array(fit_line).T
+                new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima)
             self.fitted_peaks.append(new_fit)
         if self.verbose:
             print("Fitting complete.")
@@ -295,10 +291,13 @@ class FittingExperiment:
         """Iterate a fit over multiple diffusion patterns."""
         file_list = sorted(glob.glob(self.file_stub))
         print("Processing {} diffusion patterns.".format(len(file_list)))
+        iteration_peak_params = self.peak_params
         for file_path in tqdm(file_list):
             spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
-            spectral_data.fit_peaks(self.cakes_to_fit, self.peak_params, self.merge_cakes)
+            spectral_data.fit_peaks(self.cakes_to_fit, iteration_peak_params, self.merge_cakes)
             self.spectra_fits.append(spectral_data)
+            # Here is where a function would go to pass the old fit onto the new fit.
+            iteration_peak_params = self.peak_params
         print("Analysis complete.")
 
     def list_fits(self) -> List[str]:
