@@ -12,6 +12,7 @@ matplotlib.rc('xtick', labelsize=14)
 matplotlib.rc('ytick', labelsize=14)
 matplotlib.rc('axes', titlesize=20)
 matplotlib.rc('axes', labelsize=20)
+matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
 class MaximumParams:
@@ -263,12 +264,12 @@ class FitSpectrum:
             chosen_cakes = [0] + cakes
             return self.spectral_data[np.ix_(theta_mask, chosen_cakes)]
 
-    def get_fit(self, name: str) -> Union[PeakFit, None]:
+    def get_fit(self, name: str) -> Union[PeakFit]:
         """Get a peak fit by name."""
         for fit in self.fitted_peaks:
             if fit.name == name:
                 return fit
-        return None
+        raise KeyError(f"Fit: '{name}' not found")
 
 
 class FittingExperiment:
@@ -292,13 +293,13 @@ class FittingExperiment:
         self.spectra_fits: List[FitSpectrum] = []
 
     def run_analysis(self):
-        """Iterate a fit over multiple diffusion patterns."""
+        """Iterate a fit over multiple diffraction patterns."""
         if self.frames_to_load:
             file_list = [self.file_string.format(number) for number in self.frames_to_load]
         else:
             file_list = sorted(glob.glob(self.file_string))
 
-        print("Processing {} diffusion patterns.".format(len(file_list)))
+        print("Processing {} diffraction patterns.".format(len(file_list)))
         iteration_peak_params = self.peak_params
         for file_path in tqdm(file_list):
             spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
@@ -321,20 +322,24 @@ class FittingExperiment:
                     peak_heights.append(peak_fit.result.params[fit_parameter])
                 else:
                     raise TypeError("Unknown fit parameter {}".format(fit_parameter))
-            plt.plot((np.arange(len(peak_heights)) + 1) * self.frame_time, peak_heights)
+            if self.frames_to_load:
+                x_data = np.array(self.frames_to_load) * self.frame_time
+            else:
+                x_data = (np.arange(len(peak_heights)) + 1) * self.frame_time
+            plt.plot(x_data, peak_heights)
             plt.xlabel("Time (s)")
             plt.ylabel(fit_parameter.replace("_", " ").title())
+            plt.title("Peak {}".format(peak_name))
             plt.show()
         else:
             print("Peak '{}' not found in fitted peaks.")
 
-    def fit_names(self) -> List[str]:
+    def peak_names(self) -> List[str]:
         """List the peaks that have been fitted."""
         return [peak.name for peak in self.peak_params]
 
-    def fit_parameters(self) -> List[str]:
-        """List the parameters to the fits that have been done."""
-        return self.spectra_fits[0].fitted_peaks[0].result.var_names
+    def fit_parameters(self, peak_name) -> List[str]:
+        return self.spectra_fits[0].get_fit(peak_name).result.var_names
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
