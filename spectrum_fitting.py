@@ -81,7 +81,8 @@ class PeakFit:
             for index, cake_num in enumerate(self.cake_numbers):
                 plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, index + 1], '+', ms=15,
                          mew=3, label="Cake {}".format(cake_num))
-            x_data = np.linspace(np.min(self.raw_spectrum[:, 0]), np.max(self.raw_spectrum[:, 0]), num_fit_points)
+            x_data = np.linspace(np.min(self.raw_spectrum[:, 0]), np.max(self.raw_spectrum[:, 0]),
+                                 num_fit_points)
             y_fit = self.result.model.eval(self.result.params, x=x_data)
             plt.plot(x_data, y_fit, 'k--', lw=1, label="Fit")
             plt.legend()
@@ -126,7 +127,8 @@ def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
     combined_model += lmfit.Model(lambda constant_background: constant_background)
     combined_parameters.add("constant_background", 0)
 
-    fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta)
+    fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta,
+                                     fit_kws={"xtol": 1e-4})
     return fit_results
 
 
@@ -272,7 +274,7 @@ class FitSpectrum:
 class FittingExperiment:
     """Information about a series of fits to temporally spaced diffraction patterns.
     :ivar frame_time: Time between subsequent diffraction patterns.
-    :ivar file_stub: String used to glob for the diffraction patterns.
+    :ivar file_string: String used to glob for the diffraction patterns.
     :ivar first_cake_angle:"""
     def __init__(self, frame_time: int, file_string: str, first_cake_angle: int,
                  cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
@@ -287,7 +289,7 @@ class FittingExperiment:
         self.merge_cakes = merge_cakes
         self.frames_to_load = frames_to_load
 
-        self.spectra_fits = []
+        self.spectra_fits: List[FitSpectrum] = []
 
     def run_analysis(self):
         """Iterate a fit over multiple diffusion patterns."""
@@ -306,10 +308,6 @@ class FittingExperiment:
             iteration_peak_params = self.peak_params
         print("Analysis complete.")
 
-    def list_fits(self) -> List[str]:
-        """List the peaks that have been fitted."""
-        return [peak.name for peak in self.peak_params]
-
     def plot_fit_parameter(self, peak_name: str, fit_parameter: str):
         """Plot a named parameter of a fit as a function of time.
         :param peak_name: The name of the fit to plot.
@@ -319,14 +317,24 @@ class FittingExperiment:
             peak_heights = []
             for timestep in self.spectra_fits:
                 peak_fit = timestep.get_fit(peak_name)
-                peak_heights.append(
-                    peak_fit.result.params["peak_{}_{}".format(peak_name, fit_parameter)])
+                if fit_parameter in peak_fit.result.params:
+                    peak_heights.append(peak_fit.result.params[fit_parameter])
+                else:
+                    raise TypeError("Unknown fit parameter {}".format(fit_parameter))
             plt.plot((np.arange(len(peak_heights)) + 1) * self.frame_time, peak_heights)
             plt.xlabel("Time (s)")
-            plt.ylabel("Peak {}".format(fit_parameter))
+            plt.ylabel(fit_parameter.replace("_", " ").title())
             plt.show()
         else:
             print("Peak '{}' not found in fitted peaks.")
+
+    def fit_names(self) -> List[str]:
+        """List the peaks that have been fitted."""
+        return [peak.name for peak in self.peak_params]
+
+    def fit_parameters(self) -> List[str]:
+        """List the parameters to the fits that have been done."""
+        return self.spectra_fits[0].fitted_peaks[0].result.var_names
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
