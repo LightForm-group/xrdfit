@@ -107,7 +107,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
 
     for index, peak in enumerate(peak_params):
         # Add the peak to the model
-        peak_prefix = "peak_{}_".format(index + 1)
+        peak_prefix = "maximum_{}_".format(index + 1)
         model = lmfit.models.PseudoVoigtModel(prefix=peak_prefix)
         if combined_model:
             combined_model += model
@@ -129,7 +129,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
     combined_parameters.add("constant_background", 0)
 
     fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta,
-                                     fit_kws={"xtol": 1e-4})
+                                     fit_kws={"xtol": 1e-7})
     return fit_results
 
 
@@ -189,19 +189,21 @@ class FitSpectrum:
         plt.show()
 
     def plot(self, cakes_to_plot: Union[int, List[int]], x_min: float = 0, x_max: float = 10,
-             merge_cakes: bool = False):
+             merge_cakes: bool = False, show_points=False):
         """Plot the intensity as a function of two theta for a given cake."""
         if isinstance(cakes_to_plot, int):
             cakes_to_plot = [cakes_to_plot]
-
+        line_spec = "-"
+        if show_points:
+            line_spec = "-x"
         # Plot the data
         plt.figure(figsize=(8, 6))
         if merge_cakes:
             data = self.get_spectrum_subset(cakes_to_plot, (x_min, x_max), True)
-            plt.plot(data[:, 0], data[:, 1:], '-', linewidth=2)
+            plt.plot(data[:, 0], data[:, 1:], line_spec, linewidth=2)
         else:
             for cake_num in cakes_to_plot:
-                plt.plot(self.spectral_data[:, 0], self.spectral_data[:, cake_num], '-',
+                plt.plot(self.spectral_data[:, 0], self.spectral_data[:, cake_num], line_spec,
                          linewidth=2, label=cake_num)
                 plt.legend()
 
@@ -213,8 +215,8 @@ class FitSpectrum:
         plt.tight_layout()
         plt.show()
 
-    def fit_peaks(self, cakes: Union[int, List[int]],
-                  peak_params: Union[PeakParams, List[PeakParams]], merge_cakes: bool = False):
+    def fit_peaks(self, peak_params: Union[PeakParams, List[PeakParams]],
+                  cakes: Union[int, List[int]], merge_cakes: bool = False):
         """Attempt to fit peaks within the ranges specified by `peak_ranges`.
         :param peak_params: A list of PeakParams describing the peaks to be fitted.
         :param cakes: Which cakes to fit.
@@ -274,13 +276,13 @@ class FitSpectrum:
 
 class FittingExperiment:
     """Information about a series of fits to temporally spaced diffraction patterns.
-    :ivar frame_time: Time between subsequent diffraction patterns.
+    :ivar spectrum_time: Time between subsequent diffraction patterns.
     :ivar file_string: String used to glob for the diffraction patterns.
     :ivar first_cake_angle:"""
-    def __init__(self, frame_time: int, file_string: str, first_cake_angle: int,
+    def __init__(self, spectrum_time: int, file_string: str, first_cake_angle: int,
                  cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
                  merge_cakes: bool, frames_to_load: List[int] = None):
-        self.frame_time = frame_time
+        self.spectrum_time = spectrum_time
         self.file_string = file_string
         self.first_cake_angle = first_cake_angle
         self.cakes_to_fit = cakes_to_fit
@@ -290,7 +292,7 @@ class FittingExperiment:
         self.merge_cakes = merge_cakes
         self.frames_to_load = frames_to_load
 
-        self.spectra_fits: List[FitSpectrum] = []
+        self.timesteps: List[FitSpectrum] = []
 
     def run_analysis(self):
         """Iterate a fit over multiple diffraction patterns."""
@@ -303,11 +305,18 @@ class FittingExperiment:
         iteration_peak_params = self.peak_params
         for file_path in tqdm(file_list):
             spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
-            spectral_data.fit_peaks(self.cakes_to_fit, iteration_peak_params, self.merge_cakes)
-            self.spectra_fits.append(spectral_data)
+            spectral_data.fit_peaks(iteration_peak_params, self.cakes_to_fit, self.merge_cakes)
+            self.timesteps.append(spectral_data)
             # Here is where a function would go to pass the old fit onto the new fit.
             iteration_peak_params = self.peak_params
         print("Analysis complete.")
+
+    def peak_names(self) -> List[str]:
+        """List the peaks that have been fitted."""
+        return [peak.name for peak in self.peak_params]
+
+    def fit_parameters(self, peak_name) -> List[str]:
+        return self.timesteps[0].get_fit(peak_name).result.var_names
 
     def plot_fit_parameter(self, peak_name: str, fit_parameter: str):
         """Plot a named parameter of a fit as a function of time.
@@ -315,31 +324,24 @@ class FittingExperiment:
         :param fit_parameter: The name of the fit parameter to plot.
         """
         if peak_name in [peak.name for peak in self.peak_params]:
-            peak_heights = []
-            for timestep in self.spectra_fits:
-                peak_fit = timestep.get_fit(peak_name)
-                if fit_parameter in peak_fit.result.params:
-                    peak_heights.append(peak_fit.result.params[fit_parameter])
+            if fit_parameter in self.fit_parameters(peak_name):
+                parameters = []
+                for timestep in self.timesteps:
+                    peak_fit = timestep.get_fit(peak_name)
+                    parameters.append(peak_fit.result.params[fit_parameter])
+                if self.frames_to_load:
+                    x_data = np.array(self.frames_to_load) * self.spectrum_time
                 else:
-                    raise TypeError("Unknown fit parameter {}".format(fit_parameter))
-            if self.frames_to_load:
-                x_data = np.array(self.frames_to_load) * self.frame_time
+                    x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
+                plt.plot(x_data, parameters)
+                plt.xlabel("Time (s)")
+                plt.ylabel(fit_parameter.replace("_", " ").title())
+                plt.title("Peak {}".format(peak_name))
+                plt.show()
             else:
-                x_data = (np.arange(len(peak_heights)) + 1) * self.frame_time
-            plt.plot(x_data, peak_heights)
-            plt.xlabel("Time (s)")
-            plt.ylabel(fit_parameter.replace("_", " ").title())
-            plt.title("Peak {}".format(peak_name))
-            plt.show()
+                print("Unknown fit parameter {} for peak {}".format(fit_parameter, peak_name))
         else:
             print("Peak '{}' not found in fitted peaks.")
-
-    def peak_names(self) -> List[str]:
-        """List the peaks that have been fitted."""
-        return [peak.name for peak in self.peak_params]
-
-    def fit_parameters(self, peak_name) -> List[str]:
-        return self.spectra_fits[0].get_fit(peak_name).result.var_names
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
