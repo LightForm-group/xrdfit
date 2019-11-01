@@ -27,6 +27,7 @@ class MaximumParams:
         :param sigma_min: A lower bound for the peak width.
         :param sigma_max: An upper bound for the peak width.
         :param amplitude_min: An lower bound for the amplitude of the peak.
+        :param alpha: Astarting value for the alpha or function parameter.
         """
         self.center = peak_center
         self.center_min = center_min
@@ -43,6 +44,7 @@ class MaximumParams:
             self.amplitude_min = 0.05
         else:
             self.amplitude_min = amplitude_min
+        self.alpha = 0.02
 
 
 class PeakParams:
@@ -121,6 +123,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
                                                            max=peak.center_max)
         parameters['{}sigma'.format(peak_prefix)].set(min=peak.sigma_min, max=peak.sigma_max)
         parameters['{}amplitude'.format(peak_prefix)].set(min=peak.amplitude_min)
+        parameters['{}fraction'.format(peak_prefix)].set(peak.alpha)
         if combined_parameters:
             combined_parameters += parameters
         else:
@@ -129,8 +132,14 @@ def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
     combined_parameters.add("constant_background", 0)
 
     fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta,
-                                     fit_kws={"xtol": 1e-7})
+                                     fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
     return fit_results
+
+
+def iteration_callback(params, iter, resid, *args, **kws):
+    """This method is called on every iteration of the minimisation. This can be used
+    to monitor progress."""
+    return False
 
 
 class FitSpectrum:
