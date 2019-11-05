@@ -327,7 +327,7 @@ class FittingExperiment:
     def fit_parameters(self, peak_name) -> List[str]:
         return self.timesteps[0].get_fit(peak_name).result.var_names
 
-    def plot_fit_parameter(self, peak_name: str, fit_parameter: str):
+    def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False):
         """Plot a named parameter of a fit as a function of time.
         :param peak_name: The name of the fit to plot.
         :param fit_parameter: The name of the fit parameter to plot.
@@ -342,7 +342,10 @@ class FittingExperiment:
                     x_data = np.array(self.frames_to_load) * self.spectrum_time
                 else:
                     x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
-                plt.plot(x_data, parameters)
+                line_spec = "-"
+                if show_points:
+                    line_spec = "-x"
+                plt.plot(x_data, parameters, line_spec)
                 plt.xlabel("Time (s)")
                 plt.ylabel(fit_parameter.replace("_", " ").title())
                 plt.title("Peak {}".format(peak_name))
