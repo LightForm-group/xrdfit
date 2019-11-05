@@ -16,7 +16,11 @@ matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
 class PeakParams:
-    """An object containing information about a peak and its maxima."""
+    """An object containing information about a peak and its maxima.
+    :ivar name: The name of the peak.
+    :ivar range: Where in the spectrum the peak begins and ends.
+    :ivar num_maxima: The number of maxima in this peak.
+    :ivar maxima_ranges: If there is more than one maxima, where each maximum begins and ends."""
     def __init__(self, name: str, peak_range: Tuple[float, float], num_maxima: int = 1,
                  maxima_ranges: dict = None):
         self.name = name
@@ -30,6 +34,8 @@ class PeakParams:
         self._check_maxima_ranges()
 
     def _check_maxima_ranges(self):
+        """Check that the user has provided the correct number of maxima ranges with the right
+        names for the number of peaks to be fitted."""
         for peak_num in range(1, self.num_maxima + 1):
             for min_max in ["min", "max"]:
                 param = f"{peak_num}_{min_max}"
@@ -72,7 +78,8 @@ class PeakFit:
             plt.show()
 
 
-def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict):
+def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
+              fitting_parameters: lmfit.Parameters = None):
     """
     Pseudo-Voigt fit to the lattice plane peak intensity.
     Return results of the fit as an lmfit class, which contains the fitted parameters
@@ -92,14 +99,18 @@ def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict):
 
     two_theta = peak_data[:, 0]
     intensity = peak_data[:, 1]
-    parameters = guess_params(two_theta, intensity, maxima_ranges)
 
-    fit_results = model.fit(intensity, parameters, x=two_theta,
+    if not fitting_parameters:
+        fitting_parameters = guess_params(two_theta, intensity, maxima_ranges)
+
+    fit_results = model.fit(intensity, fitting_parameters, x=two_theta,
                             fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
     return fit_results
 
 
 def guess_params(x_data, y_data, maxima_ranges: dict) -> lmfit.Parameters:
+    """Given a dataset and some details about where the maxima are, guess some good initial
+    values for the PV fit."""
     params = lmfit.Parameters()
     num_maxima = len(maxima_ranges) // 2
     for index in range(1, num_maxima + 1):
@@ -226,11 +237,13 @@ class FitSpectrum:
             new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.range, merge_cakes)
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
-                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.num_maxima, peak.maxima_ranges)
+                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.num_maxima,
+                                           peak.maxima_ranges)
             else:
                 new_fit.cake_numbers = list(map(str, cakes))
                 stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
-                new_fit.result = do_pv_fit(stacked_spectrum, peak.num_maxima, peak.maxima_ranges)
+                new_fit.result = do_pv_fit(stacked_spectrum, peak.num_maxima,
+                                           peak.maxima_ranges)
             self.fitted_peaks.append(new_fit)
         if self.verbose:
             print("Fitting complete.")
@@ -294,13 +307,11 @@ class FittingExperiment:
             file_list = sorted(glob.glob(self.file_string))
 
         print("Processing {} diffraction patterns.".format(len(file_list)))
-        iteration_peak_params = self.peak_params
         for file_path in tqdm(file_list):
             spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
-            spectral_data.fit_peaks(iteration_peak_params, self.cakes_to_fit, self.merge_cakes)
+            spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes)
             self.timesteps.append(spectral_data)
             # Here is where a function would go to pass the old fit onto the new fit.
-            iteration_peak_params = self.peak_params
         print("Analysis complete.")
 
     def peak_names(self) -> List[str]:
@@ -308,12 +319,16 @@ class FittingExperiment:
         return [peak.name for peak in self.peak_params]
 
     def fit_parameters(self, peak_name) -> List[str]:
+        """List the parameters of the fit for a specified peak.
+        :param peak_name: The peak to list the parameters of.
+        """
         return self.timesteps[0].get_fit(peak_name).result.var_names
 
     def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False):
         """Plot a named parameter of a fit as a function of time.
         :param peak_name: The name of the fit to plot.
         :param fit_parameter: The name of the fit parameter to plot.
+        :param show_points: Whether to show data points on the plot.
         """
         if peak_name in [peak.name for peak in self.peak_params]:
             if fit_parameter in self.fit_parameters(peak_name):
