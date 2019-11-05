@@ -15,55 +15,26 @@ matplotlib.rc('axes', labelsize=20)
 matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
-class MaximumParams:
-    """An object containing fitting details of a single maximum within a peak."""
-    def __init__(self, fitting_parameters: dict):
-        """
-        :param fitting_parameters: Parameters for the pseudo-Voigt Fit of a maximum.
-        :param alpha: Astarting value for the alpha or function parameter.
-        """
-        self.fitting_parameters = fitting_parameters
-
-        # Required parameters are those required for the fit - if user does not provide them
-        # they will be set to default values
-        required_parameters = ["amplitude", "center", "sigma", "fraction"]
-        min_parameters = [f"{param}_min" for param in required_parameters]
-        max_parameters = [f"{param}_max" for param in required_parameters]
-        required_parameters.extend(min_parameters)
-        required_parameters.extend(max_parameters)
-
-        self._check_parameters_valid(required_parameters)
-
-        self._set_param_defaults(required_parameters)
-
-    def _set_param_defaults(self, required_parameters: List[str]):
-        """Set default values for parameters if they are not set by the user."""
-        if "sigma_min" not in self.fitting_parameters:
-            self.fitting_parameters["sigma_min"] = 0.01
-        if "sigma_max" not in self.fitting_parameters:
-            self.fitting_parameters["sigma_max"] = 0.02
-        if "amplitude_min" not in self.fitting_parameters:
-            self.fitting_parameters["amplitude_min"] = 0.05
-        for param in required_parameters:
-            if param not in self.fitting_parameters:
-                self.fitting_parameters[param] = None
-
-    def _check_parameters_valid(self, valid_parameters):
-        for key in self.fitting_parameters:
-            if key not in valid_parameters:
-                raise TypeError(f"Fitting parameter {key} not valid.")
-
-
 class PeakParams:
     """An object containing information about a peak and its maxima."""
-    def __init__(self, name: str, peak_range: Tuple[float, float],
-                 maxima: List[MaximumParams] = None):
+    def __init__(self, name: str, peak_range: Tuple[float, float], num_maxima: int,
+                 maxima_ranges: dict = None):
         self.name = name
         self.range = peak_range
-        if maxima:
-            self.maxima = maxima
+        self.num_maxima = num_maxima
+        if maxima_ranges:
+            self.maxima_ranges = maxima_ranges
         else:
-            self.maxima = [MaximumParams({})]
+            self.maxima_ranges = {"1_min": peak_range[0], "1_max": peak_range[1]}
+
+        self._check_maxima_ranges()
+
+    def _check_maxima_ranges(self):
+        for peak_num in range(1, self.num_maxima + 1):
+            for min_max in ["min", "max"]:
+                param = f"{peak_num}_{min_max}"
+                if param not in self.maxima_ranges:
+                    raise TypeError(f"Maxima descriptor {param} is missing.")
 
 
 class PeakFit:
@@ -101,46 +72,51 @@ class PeakFit:
             plt.show()
 
 
-def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
+def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict):
     """
     Pseudo-Voigt fit to the lattice plane peak intensity.
     Return results of the fit as an lmfit class, which contains the fitted parameters
     (amplitude, fwhm, etc.) and the fit line calculated using the fit parameters and
     100x two-theta points.
     """
+    model = None
+    peak_prefix = "maximum_{}_"
+
+    for maxima_num in range(num_maxima):
+        # Add the peak to the model
+        if model:
+            model += lmfit.models.PseudoVoigtModel(prefix=peak_prefix.format(maxima_num + 1))
+        else:
+            model = lmfit.models.PseudoVoigtModel(prefix=peak_prefix.format(maxima_num + 1))
+    model += lmfit.Model(lambda background: background)
+
     two_theta = peak_data[:, 0]
     intensity = peak_data[:, 1]
+    parameters = guess_params(two_theta, intensity, maxima_ranges)
 
-    combined_model = None
-    combined_parameters = None
-
-    for index, peak_params in enumerate(peak_params):
-        # Add the peak to the model
-        params = peak_params.fitting_parameters
-        peak_prefix = "maximum_{}_".format(index + 1)
-        model = lmfit.models.PseudoVoigtModel(prefix=peak_prefix)
-        if combined_model:
-            combined_model += model
-        else:
-            combined_model = model
-
-        parameters = model.guess(intensity, x=two_theta)
-
-        # Add the fit parameters for the peak
-        for param in model.def_vals.keys():
-            parameters[f'{peak_prefix}{param}'].set(value=params[f"{param}"],
-                                                    min=params[f"{param}_min"],
-                                                    max=params[f"{param}_max"])
-        if combined_parameters:
-            combined_parameters += parameters
-        else:
-            combined_parameters = parameters
-    combined_model += lmfit.Model(lambda background: background)
-    combined_parameters.add("background", 0)
-
-    fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta,
-                                     fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
+    fit_results = model.fit(intensity, parameters, x=two_theta,
+                            fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
     return fit_results
+
+
+def guess_params(x_data, y_data, maxima_ranges: dict) -> lmfit.Parameters:
+    params = lmfit.Parameters()
+    num_maxima = len(maxima_ranges) // 2
+    for index in range(1, num_maxima + 1):
+        maximum_mask = np.logical_and(x_data < maxima_ranges[f"{index}_max"],
+                                      x_data > maxima_ranges[f"{index}_min"])
+        maxima_x = x_data[maximum_mask]
+        maxima_y = y_data[maximum_mask]
+        center = maxima_x[np.argmax(maxima_y)]
+        sigma = 0.02
+        amplitude = ((max(maxima_y) - min(maxima_y)) * 3) * sigma * 1.25
+
+        params.add(f"maximum_{index}_center", value=center, min=center - 0.02, max=center + 0.02)
+        params.add(f"maximum_{index}_sigma", value=sigma, min=0.005, max=0.04)
+        params.add(f"maximum_{index}_fraction", value=0.5, min=0, max=1)
+        params.add(f"maximum_{index}_amplitude", value=amplitude, min=0.05)
+    params.add("background", value=0, min=0)
+    return params
 
 
 def iteration_callback(params, iter, resid, *args, **kws):
@@ -250,11 +226,11 @@ class FitSpectrum:
             new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.range, merge_cakes)
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
-                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.maxima)
+                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.num_maxima, peak.maxima_ranges)
             else:
                 new_fit.cake_numbers = list(map(str, cakes))
                 stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
-                new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima)
+                new_fit.result = do_pv_fit(stacked_spectrum, peak.num_maxima, peak.maxima_ranges)
             self.fitted_peaks.append(new_fit)
         if self.verbose:
             print("Fitting complete.")
