@@ -17,7 +17,7 @@ matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 class PeakParams:
     """An object containing information about a peak and its maxima."""
-    def __init__(self, name: str, peak_range: Tuple[float, float], num_maxima: int,
+    def __init__(self, name: str, peak_range: Tuple[float, float], num_maxima: int = 1,
                  maxima_ranges: dict = None):
         self.name = name
         self.range = peak_range
