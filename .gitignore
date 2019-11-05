@@ -6,3 +6,4 @@ __pycache__/
 /.idea
 /venv
 /example_data/adc_041_7Nb
+/tutorial notebooks/working_copy.ipynb

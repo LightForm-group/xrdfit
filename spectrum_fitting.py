@@ -17,34 +17,41 @@ matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 class MaximumParams:
     """An object containing fitting details of a single maximum within a peak."""
-    def __init__(self, peak_center: float = None, center_min: float = None,
-                 center_max: float = None, sigma_min: float = None,
-                 sigma_max: float = None, amplitude_min: float = None):
+    def __init__(self, fitting_parameters: dict):
         """
-        :param peak_center: The approximate center of the peak.
-        :param center_min: The minimum bound for the center of the peak.
-        :param center_max: The maximum bound for the center of the peak.
-        :param sigma_min: A lower bound for the peak width.
-        :param sigma_max: An upper bound for the peak width.
-        :param amplitude_min: An lower bound for the amplitude of the peak.
+        :param fitting_parameters: Parameters for the pseudo-Voigt Fit of a maximum.
         :param alpha: Astarting value for the alpha or function parameter.
         """
-        self.center = peak_center
-        self.center_min = center_min
-        self.center_max = center_max
-        if sigma_min is None:
-            self.sigma_min = 0.01
-        else:
-            self.sigma_min = sigma_min
-        if sigma_max is None:
-            self.sigma_max = 0.02
-        else:
-            self.sigma_max = sigma_max
-        if amplitude_min is None:
-            self.amplitude_min = 0.05
-        else:
-            self.amplitude_min = amplitude_min
-        self.alpha = 0.02
+        self.fitting_parameters = fitting_parameters
+
+        # Required parameters are those required for the fit - if user does not provide them
+        # they will be set to default values
+        required_parameters = ["amplitude", "center", "sigma", "fraction"]
+        min_parameters = [f"{param}_min" for param in required_parameters]
+        max_parameters = [f"{param}_max" for param in required_parameters]
+        required_parameters.extend(min_parameters)
+        required_parameters.extend(max_parameters)
+
+        self._check_parameters_valid(required_parameters)
+
+        self._set_param_defaults(required_parameters)
+
+    def _set_param_defaults(self, required_parameters: List[str]):
+        """Set default values for parameters if they are not set by the user."""
+        if "sigma_min" not in self.fitting_parameters:
+            self.fitting_parameters["sigma_min"] = 0.01
+        if "sigma_max" not in self.fitting_parameters:
+            self.fitting_parameters["sigma_max"] = 0.02
+        if "amplitude_min" not in self.fitting_parameters:
+            self.fitting_parameters["amplitude_min"] = 0.05
+        for param in required_parameters:
+            if param not in self.fitting_parameters:
+                self.fitting_parameters[param] = None
+
+    def _check_parameters_valid(self, valid_parameters):
+        for key in self.fitting_parameters:
+            if key not in valid_parameters:
+                raise TypeError(f"Fitting parameter {key} not valid.")
 
 
 class PeakParams:
@@ -56,7 +63,7 @@ class PeakParams:
         if maxima:
             self.maxima = maxima
         else:
-            self.maxima = [MaximumParams()]
+            self.maxima = [MaximumParams({})]
 
 
 class PeakFit:
@@ -107,8 +114,9 @@ def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
     combined_model = None
     combined_parameters = None
 
-    for index, peak in enumerate(peak_params):
+    for index, peak_params in enumerate(peak_params):
         # Add the peak to the model
+        params = peak_params.fitting_parameters
         peak_prefix = "maximum_{}_".format(index + 1)
         model = lmfit.models.PseudoVoigtModel(prefix=peak_prefix)
         if combined_model:
@@ -116,20 +124,19 @@ def do_pv_fit(peak_data: np.ndarray, peak_params: List[MaximumParams]):
         else:
             combined_model = model
 
-        # Add the fit parameters for the peak
         parameters = model.guess(intensity, x=two_theta)
-        if peak.center:
-            parameters['{}center'.format(peak_prefix)].set(peak.center, min=peak.center_min,
-                                                           max=peak.center_max)
-        parameters['{}sigma'.format(peak_prefix)].set(min=peak.sigma_min, max=peak.sigma_max)
-        parameters['{}amplitude'.format(peak_prefix)].set(min=peak.amplitude_min)
-        parameters['{}fraction'.format(peak_prefix)].set(peak.alpha)
+
+        # Add the fit parameters for the peak
+        for param in model.def_vals.keys():
+            parameters[f'{peak_prefix}{param}'].set(value=params[f"{param}"],
+                                                    min=params[f"{param}_min"],
+                                                    max=params[f"{param}_max"])
         if combined_parameters:
             combined_parameters += parameters
         else:
             combined_parameters = parameters
-    combined_model += lmfit.Model(lambda constant_background: constant_background)
-    combined_parameters.add("constant_background", 0)
+    combined_model += lmfit.Model(lambda background: background)
+    combined_parameters.add("background", 0)
 
     fit_results = combined_model.fit(intensity, combined_parameters, x=two_theta,
                                      fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
