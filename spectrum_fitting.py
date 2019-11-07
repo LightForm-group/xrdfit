@@ -34,6 +34,18 @@ class PeakParams:
             self.maxima_ranges = {"1_min": peak_range[0], "1_max": peak_range[1]}
 
         self._check_maxima_ranges()
+        self.previous_fit: Union[lmfit.Parameters, None] = None
+
+    def set_previous_fit(self, fit_parameters: lmfit.Parameters):
+        # Since the center may drift over time the lmits must be reset otherwise it will always
+        # have the limits from the first fit.
+        for parameter in fit_parameters:
+            if "center" in parameter:
+                center_value = fit_parameters[parameter]
+                center_min = center_value - 0.02
+                center_max = center_value + 0.02
+                fit_parameters[parameter].set(value=None, min=center_min, max=center_max)
+        self.previous_fit = fit_parameters
 
     def _check_maxima_ranges(self):
         """Check that the user has provided the correct number of maxima ranges with the right
@@ -105,9 +117,10 @@ def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
     if not fit_parameters:
         fit_parameters = guess_params(two_theta, intensity, maxima_ranges)
 
-    fit_results = model.fit(intensity, fit_parameters, x=two_theta,
-                            fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
-    return fit_results
+    fit_result = model.fit(intensity, fit_parameters, x=two_theta,
+                           fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
+
+    return fit_result
 
 
 def guess_params(x_data, y_data, maxima_ranges: dict) -> lmfit.Parameters:
@@ -122,13 +135,13 @@ def guess_params(x_data, y_data, maxima_ranges: dict) -> lmfit.Parameters:
         maxima_y = y_data[maximum_mask]
         center = maxima_x[np.argmax(maxima_y)]
         sigma = 0.02
-        amplitude = ((max(maxima_y) - min(maxima_y)) * 3) * sigma * 1.25
+        amplitude = ((max(maxima_y) - min(maxima_y)) * 3) * sigma
 
         params.add(f"maximum_{index}_center", value=center, min=center - 0.02, max=center + 0.02)
         params.add(f"maximum_{index}_sigma", value=sigma, min=0.005, max=0.04)
-        params.add(f"maximum_{index}_fraction", value=0.5, min=0, max=1)
+        params.add(f"maximum_{index}_fraction", value=0.2, min=0, max=1)
         params.add(f"maximum_{index}_amplitude", value=amplitude, min=0.05)
-    params.add("background", value=0, min=0)
+    params.add("background", value=10, min=0, max=None)
     return params
 
 
@@ -219,12 +232,12 @@ class FitSpectrum:
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
                 new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.num_maxima,
-                                           peak.maxima_ranges)
+                                           peak.maxima_ranges, peak.previous_fit)
             else:
                 new_fit.cake_numbers = list(map(str, cakes))
                 stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
-                new_fit.result = do_pv_fit(stacked_spectrum, peak.num_maxima,
-                                           peak.maxima_ranges)
+                new_fit.result = do_pv_fit(stacked_spectrum, peak.num_maxima, peak.maxima_ranges,
+                                           peak.previous_fit)
             self.fitted_peaks.append(new_fit)
         if self.verbose:
             print("Fitting complete.")
@@ -266,7 +279,7 @@ class FittingExperiment:
     :ivar first_cake_angle:"""
     def __init__(self, spectrum_time: int, file_string: str, first_cake_angle: int,
                  cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
-                 merge_cakes: bool, frames_to_load: List[int] = None):
+                 merge_cakes: bool, frames_to_load: List[int] = None, reuse_fits=False):
         self.spectrum_time = spectrum_time
         self.file_string = file_string
         self.first_cake_angle = first_cake_angle
@@ -276,6 +289,7 @@ class FittingExperiment:
         self.peak_params = peak_params
         self.merge_cakes = merge_cakes
         self.frames_to_load = frames_to_load
+        self.reuse_fits = reuse_fits
 
         self.timesteps: List[FitSpectrum] = []
 
@@ -291,7 +305,12 @@ class FittingExperiment:
             spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
             spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes)
             self.timesteps.append(spectral_data)
-            # Here is where a function would go to pass the old fit onto the new fit.
+
+            if self.reuse_fits:
+                # Pass the results of the fit on to the next time step.
+                for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
+                    peak_params.set_previous_fit(peak_fit.result.params)
+
         print("Analysis complete.")
 
     def peak_names(self) -> List[str]:
