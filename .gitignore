@@ -5,3 +5,5 @@ __pycache__/
 *.fuse
 /.idea
 /venv
+/example_data/adc_041_7Nb
+/tutorial notebooks/working_copy.ipynb
