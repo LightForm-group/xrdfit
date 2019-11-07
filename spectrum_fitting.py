@@ -8,6 +8,8 @@ import lmfit
 from tqdm import tqdm
 import pandas as pd
 
+import plotting
+
 matplotlib.rc('xtick', labelsize=14)
 matplotlib.rc('ytick', labelsize=14)
 matplotlib.rc('axes', titlesize=20)
@@ -79,7 +81,7 @@ class PeakFit:
 
 
 def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
-              fitting_parameters: lmfit.Parameters = None):
+              fit_parameters: lmfit.Parameters = None):
     """
     Pseudo-Voigt fit to the lattice plane peak intensity.
     Return results of the fit as an lmfit class, which contains the fitted parameters
@@ -100,10 +102,10 @@ def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
     two_theta = peak_data[:, 0]
     intensity = peak_data[:, 1]
 
-    if not fitting_parameters:
-        fitting_parameters = guess_params(two_theta, intensity, maxima_ranges)
+    if not fit_parameters:
+        fit_parameters = guess_params(two_theta, intensity, maxima_ranges)
 
-    fit_results = model.fit(intensity, fitting_parameters, x=two_theta,
+    fit_results = model.fit(intensity, fit_parameters, x=two_theta,
                             fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
     return fit_results
 
@@ -159,7 +161,7 @@ class FitSpectrum:
             z_data = np.log10(self.spectral_data[:, 1:])
         rad = self.spectral_data[:, 0]
         num_cakes = z_data.shape[1]
-        self._plot_polar_heatmap(num_cakes, rad, z_data)
+        plotting.plot_polar_heatmap(num_cakes, rad, z_data, self.first_cake_angle)
 
     def highlight_cakes(self, cakes: Union[int, List[int]]):
         """Plot a circular map of the cakes with the selected cakes highlighted."""
@@ -168,28 +170,7 @@ class FitSpectrum:
         for cake_num in cakes:
             z_data[0, cake_num - 1] = 1
         rad = [0, 1]
-        self._plot_polar_heatmap(num_cakes, rad, z_data)
-
-    def _plot_polar_heatmap(self, num_cakes, rad, z_data):
-        """A method for plotting a polar heatmap."""
-        azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
-        r, theta = np.meshgrid(rad, azm)
-        plt.subplot(projection="polar", theta_direction=-1,
-                    theta_offset=np.deg2rad(360 / num_cakes / 2))
-        plt.pcolormesh(theta, r, z_data.T)
-        plt.plot(azm, r, ls='none')
-        plt.grid()
-        # Turn on theta grid lines at the cake edges
-        plt.thetagrids([theta * 360 / num_cakes for theta in range(num_cakes)], labels=[])
-        # Turn off radial grid lines
-        plt.rgrids([])
-        # Put the cake numbers in the right places
-        ax = plt.gca()
-        trans, _, _ = ax.get_xaxis_text1_transform(0)
-        for label in range(1, num_cakes + 1):
-            ax.text(np.deg2rad(label * 10 - 95 + self.first_cake_angle), -0.1, label,
-                    transform=trans, rotation=0, ha="center", va="center")
-        plt.show()
+        plotting.plot_polar_heatmap(num_cakes, rad, z_data, self.first_cake_angle)
 
     def plot(self, cakes_to_plot: Union[int, List[int]], x_min: float = 0, x_max: float = 10,
              merge_cakes: bool = False, show_points=False):
@@ -248,8 +229,7 @@ class FitSpectrum:
         if self.verbose:
             print("Fitting complete.")
 
-    def get_spectrum_subset(self, cakes: Union[int, List[int]],
-                            two_theta_lims: Tuple[float, float],
+    def get_spectrum_subset(self, cakes: Union[int, List[int]], two_theta_lims: Tuple[float, float],
                             merge_cakes: bool) -> np.ndarray:
         """Return spectral intensity as a function of 2-theta for a selected 2-theta range.
         :param cakes: One or more cakes to get the intensity for.
