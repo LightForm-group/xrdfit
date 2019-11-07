@@ -138,10 +138,10 @@ def guess_params(x_data, y_data, maxima_ranges: dict) -> lmfit.Parameters:
         amplitude = ((max(maxima_y) - min(maxima_y)) * 3) * sigma
 
         params.add(f"maximum_{index}_center", value=center, min=center - 0.02, max=center + 0.02)
-        params.add(f"maximum_{index}_sigma", value=sigma, min=0.005, max=0.04)
+        params.add(f"maximum_{index}_sigma", value=sigma, min=0.01, max=0.02)
         params.add(f"maximum_{index}_fraction", value=0.2, min=0, max=1)
         params.add(f"maximum_{index}_amplitude", value=amplitude, min=0.05)
-    params.add("background", value=10, min=0, max=None)
+    params.add("background", value=min(y_data), min=0, max=max(y_data))
     return params
 
 
@@ -323,12 +323,9 @@ class FittingExperiment:
         """
         return self.timesteps[0].get_fit(peak_name).result.var_names
 
-    def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False):
-        """Plot a named parameter of a fit as a function of time.
-        :param peak_name: The name of the fit to plot.
-        :param fit_parameter: The name of the fit parameter to plot.
-        :param show_points: Whether to show data points on the plot.
-        """
+    def get_fit_parameter(self, peak_name: str,
+                          fit_parameter: str) -> Union[None, np.ndarray]:
+        """Get a fitting parameter over time."""
         if peak_name in [peak.name for peak in self.peak_params]:
             if fit_parameter in self.fit_parameters(peak_name):
                 parameters = []
@@ -339,18 +336,24 @@ class FittingExperiment:
                     x_data = np.array(self.frames_to_load) * self.spectrum_time
                 else:
                     x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
-                line_spec = "-"
-                if show_points:
-                    line_spec = "-x"
-                plt.plot(x_data, parameters, line_spec)
-                plt.xlabel("Time (s)")
-                plt.ylabel(fit_parameter.replace("_", " ").title())
-                plt.title("Peak {}".format(peak_name))
-                plt.show()
+                data = np.vstack((x_data, parameters)).T
+                return data
             else:
                 print("Unknown fit parameter {} for peak {}".format(fit_parameter, peak_name))
+                return None
         else:
             print("Peak '{}' not found in fitted peaks.")
+            return None
+
+    def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False):
+        """Plot a named parameter of a fit as a function of time.
+        :param peak_name: The name of the fit to plot.
+        :param fit_parameter: The name of the fit parameter to plot.
+        :param show_points: Whether to show data points on the plot.
+        """
+        data = self.get_fit_parameter(peak_name, fit_parameter)
+        if data is not None:
+            plotting.plot_parameter(data, fit_parameter, peak_name, show_points)
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:

@@ -22,3 +22,14 @@ def plot_polar_heatmap(num_cakes, rad, z_data, first_cake_angle):
         ax.text(np.deg2rad(label * 10 - 95 + first_cake_angle), -0.1, label,
                 transform=trans, rotation=0, ha="center", va="center")
     plt.show()
+
+
+def plot_parameter(data, fit_parameter, peak_name, show_points):
+    line_spec = "-"
+    if show_points:
+        line_spec = "-x"
+    plt.plot(data[:, 0], data[:, 1], line_spec)
+    plt.xlabel("Time (s)")
+    plt.ylabel(fit_parameter.replace("_", " ").title())
+    plt.title("Peak {}".format(peak_name))
+    plt.show()

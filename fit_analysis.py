@@ -7,9 +7,9 @@ def calc_d_spacing(ttheta):
     """ Calculate d-spacing from two-theta values.
     """
     x_ray_energy = 89.07  # in keV
-    c = 2.99792458e8
-    h = 6.62607004e-34
-    e = 1.6021766208e-19
+    c = 2.99792458e8  # Speed of light m/s
+    h = 6.62607004e-34  # Planck's constant
+    e = 1.6021766208e-19  # Electron charge
     x_ray_wavelength = (h * c) / (x_ray_energy * 1e3 * e)
 
     return x_ray_wavelength / (2 * np.sin(np.array(ttheta) * np.pi / 360))
