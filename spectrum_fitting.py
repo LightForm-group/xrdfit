@@ -1,3 +1,4 @@
+import bz2
 import glob
 from typing import List, Tuple, Union
 
@@ -6,6 +7,7 @@ import numpy as np
 import lmfit
 from tqdm import tqdm
 import pandas as pd
+import dill
 
 import plotting
 
@@ -318,6 +320,13 @@ class FittingExperiment:
         if data is not None:
             plotting.plot_parameter(data, fit_parameter, peak_name, show_points)
 
+    def save(self, file_name: str):
+        """Dump the object to a compressed binary file using dill."""
+        print("Saving data to dump file.")
+        with bz2.open(file_name, 'wb') as output_file:
+            dill.dump(self, output_file)
+        print("Data successfully saved to dump file.")
+
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
     """Take an number of observations from N different cakes and stack them vertically into a 2
@@ -329,3 +338,12 @@ def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
             (stacked_data, spectrum[np.ix_([True] * spectrum.shape[0], [0, column_num])]))
     stacked_data = stacked_data[stacked_data[:, 0].argsort()]
     return stacked_data
+
+
+def load_dump(file_name: str) -> FittingExperiment:
+    """Load a FittingExperiment object saved using the FittingExperiment.save method."""
+    print("Loading data from dump file.")
+    with bz2.open(file_name, "rb") as input_file:
+        data = dill.load(input_file)
+        print("Data successfully loaded from dump file.")
+        return data

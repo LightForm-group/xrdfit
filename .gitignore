@@ -7,3 +7,4 @@ __pycache__/
 /venv
 /example_data/adc_041_7Nb
 /tutorial notebooks/working_copy.ipynb
+/tutorial notebooks/experiment.dump
