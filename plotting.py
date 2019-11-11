@@ -25,9 +25,11 @@ def plot_polar_heatmap(num_cakes, rad, z_data, first_cake_angle):
     # Put the cake numbers in the right places
     ax = plt.gca()
     trans, _, _ = ax.get_xaxis_text1_transform(0)
+    degrees_per_cake = 360/num_cakes
+    half_cake = degrees_per_cake / 2
     for label in range(1, num_cakes + 1):
-        ax.text(np.deg2rad(label * 10 - 95 + first_cake_angle), -0.1, label,
-                transform=trans, rotation=0, ha="center", va="center")
+        ax.text(np.deg2rad(label * degrees_per_cake - 90 - half_cake + first_cake_angle), -0.1,
+                label, transform=trans, rotation=0, ha="center", va="center")
     plt.show()
 
 
