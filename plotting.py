@@ -1,5 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+
+matplotlib.rc('xtick', labelsize=14)
+matplotlib.rc('ytick', labelsize=14)
+matplotlib.rc('axes', titlesize=20)
+matplotlib.rc('axes', labelsize=20)
+matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
 def plot_polar_heatmap(num_cakes, rad, z_data, first_cake_angle):
@@ -24,12 +31,60 @@ def plot_polar_heatmap(num_cakes, rad, z_data, first_cake_angle):
     plt.show()
 
 
+def plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_min, x_max):
+    """Plot a raw spectrum."""
+    plt.figure(figsize=(8, 6))
+    line_spec = get_line_spec(show_points)
+    if merge_cakes:
+        plt.plot(data[:, 0], data[:, 1:], line_spec, linewidth=2)
+    else:
+        for cake_num in cakes_to_plot:
+            plt.plot(data[:, 0], data[:, cake_num], line_spec, linewidth=2, label=cake_num)
+        plt.legend()
+
+    # Plot formatting
+    plt.minorticks_on()
+    plt.xlabel(r'Two Theta ($^\circ$)')
+    plt.ylabel('Intensity')
+    plt.xlim(x_min, x_max)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_peak_fit(data, cake_numbers, fit_result, fit_name):
+    """Plot the result of a peak fit as well as the raw data."""
+    plt.figure(figsize=(8, 6))
+
+    # First plot the raw data
+    for index, cake_num in enumerate(cake_numbers):
+        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=15, mew=3, label="Cake {}".format(cake_num))
+
+    # Now plot the fit
+    x_data = np.linspace(np.min(data[:, 0]), np.max(data[:, 0]), 100)
+    y_fit = fit_result.model.eval(fit_result.params, x=x_data)
+    plt.plot(x_data, y_fit, 'k--', lw=1, label="Fit")
+    plt.minorticks_on()
+    plt.tight_layout()
+    plt.xlabel(r'Two Theta ($^\circ$)')
+    plt.ylabel('Intensity')
+    plt.legend()
+    plt.title(fit_name)
+    plt.tight_layout()
+    plt.show()
+
+
 def plot_parameter(data, fit_parameter, peak_name, show_points):
-    line_spec = "-"
-    if show_points:
-        line_spec = "-x"
+    """Plot a parameter of a fit against time."""
+    line_spec = get_line_spec(show_points)
     plt.plot(data[:, 0], data[:, 1], line_spec)
     plt.xlabel("Time (s)")
     plt.ylabel(fit_parameter.replace("_", " ").title())
     plt.title("Peak {}".format(peak_name))
     plt.show()
+
+
+def get_line_spec(show_points):
+    """Determine how the data points are shown with and without the raw data."""
+    if show_points:
+        return "-x"
+    return "-"

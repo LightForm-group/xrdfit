@@ -2,19 +2,12 @@ import glob
 from typing import List, Tuple, Union
 
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
+
 import lmfit
 from tqdm import tqdm
 import pandas as pd
 
 import plotting
-
-matplotlib.rc('xtick', labelsize=14)
-matplotlib.rc('ytick', labelsize=14)
-matplotlib.rc('axes', titlesize=20)
-matplotlib.rc('axes', labelsize=20)
-matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
 class PeakParams:
@@ -37,8 +30,8 @@ class PeakParams:
         self.previous_fit: Union[lmfit.Parameters, None] = None
 
     def set_previous_fit(self, fit_parameters: lmfit.Parameters):
-        # Since the center may drift over time the lmits must be reset otherwise it will always
-        # have the limits from the first fit.
+        """Since the peak center may drift over time the limits must be reset otherwise it
+         will always have the limits from the first fit."""
         for parameter in fit_parameters:
             if "center" in parameter:
                 center_value = fit_parameters[parameter]
@@ -69,27 +62,12 @@ class PeakFit:
         self.result: Union[None, lmfit.model.ModelResult] = None
         self.cake_numbers: List[int] = []
 
-    def plot(self, num_fit_points=100):
+    def plot(self):
         """ Plot the raw spectral data and the fit."""
         if self.raw_spectrum is None:
             print("Cannot plot fit peak as fitting has not been done yet.")
         else:
-            plt.figure(figsize=(8, 6))
-            plt.minorticks_on()
-            plt.tight_layout()
-            plt.xlabel(r'Two Theta ($^\circ$)')
-            plt.ylabel('Intensity')
-            for index, cake_num in enumerate(self.cake_numbers):
-                plt.plot(self.raw_spectrum[:, 0], self.raw_spectrum[:, index + 1], '+', ms=15,
-                         mew=3, label="Cake {}".format(cake_num))
-            x_data = np.linspace(np.min(self.raw_spectrum[:, 0]), np.max(self.raw_spectrum[:, 0]),
-                                 num_fit_points)
-            y_fit = self.result.model.eval(self.result.params, x=x_data)
-            plt.plot(x_data, y_fit, 'k--', lw=1, label="Fit")
-            plt.legend()
-            plt.title(self.name)
-            plt.tight_layout()
-            plt.show()
+            plotting.plot_peak_fit(self.raw_spectrum, self.cake_numbers, self.result, self.name)
 
 
 def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
@@ -190,27 +168,12 @@ class FitSpectrum:
         """Plot the intensity as a function of two theta for a given cake."""
         if isinstance(cakes_to_plot, int):
             cakes_to_plot = [cakes_to_plot]
-        line_spec = "-"
-        if show_points:
-            line_spec = "-x"
-        # Plot the data
-        plt.figure(figsize=(8, 6))
+        # Get the data to plot
         if merge_cakes:
             data = self.get_spectrum_subset(cakes_to_plot, (x_min, x_max), True)
-            plt.plot(data[:, 0], data[:, 1:], line_spec, linewidth=2)
         else:
-            for cake_num in cakes_to_plot:
-                plt.plot(self.spectral_data[:, 0], self.spectral_data[:, cake_num], line_spec,
-                         linewidth=2, label=cake_num)
-                plt.legend()
-
-        # Plot formatting
-        plt.minorticks_on()
-        plt.xlabel(r'Two Theta ($^\circ$)')
-        plt.ylabel('Intensity')
-        plt.xlim(x_min, x_max)
-        plt.tight_layout()
-        plt.show()
+            data = self.spectral_data
+        plotting.plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_min, x_max)
 
     def fit_peaks(self, peak_params: Union[PeakParams, List[PeakParams]],
                   cakes: Union[int, List[int]], merge_cakes: bool = False):
