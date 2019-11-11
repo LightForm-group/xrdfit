@@ -57,7 +57,7 @@ def plot_peak_fit(data, cake_numbers, fit_result, fit_name):
 
     # First plot the raw data
     for index, cake_num in enumerate(cake_numbers):
-        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=15, mew=3, label="Cake {}".format(cake_num))
+        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label="Cake {}".format(cake_num))
 
     # Now plot the fit
     x_data = np.linspace(np.min(data[:, 0]), np.max(data[:, 0]), 100)
