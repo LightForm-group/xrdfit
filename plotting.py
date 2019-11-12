@@ -1,3 +1,6 @@
+from typing import Tuple, List
+
+import lmfit
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
@@ -33,7 +36,8 @@ def plot_polar_heatmap(num_cakes, rad, z_data, first_cake_angle):
     plt.show()
 
 
-def plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_min, x_max):
+def plot_spectrum(data, cakes_to_plot, merge_cakes: bool, show_points: bool,
+                  x_range: Tuple[float, float]):
     """Plot a raw spectrum."""
     plt.figure(figsize=(8, 6))
     line_spec = get_line_spec(show_points)
@@ -48,18 +52,19 @@ def plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_min, x_max):
     plt.minorticks_on()
     plt.xlabel(r'Two Theta ($^\circ$)')
     plt.ylabel('Intensity')
-    plt.xlim(x_min, x_max)
+    plt.xlim(x_range[0], x_range[1])
     plt.tight_layout()
     plt.show()
 
 
-def plot_peak_fit(data, cake_numbers, fit_result, fit_name):
+def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
+                  fit_name: str):
     """Plot the result of a peak fit as well as the raw data."""
     plt.figure(figsize=(8, 6))
 
     # First plot the raw data
     for index, cake_num in enumerate(cake_numbers):
-        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label="Cake {}".format(cake_num))
+        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label=f"Cake {cake_num}")
 
     # Now plot the fit
     x_data = np.linspace(np.min(data[:, 0]), np.max(data[:, 0]), 100)
@@ -75,7 +80,7 @@ def plot_peak_fit(data, cake_numbers, fit_result, fit_name):
     plt.show()
 
 
-def plot_parameter(data, fit_parameter, peak_name, show_points):
+def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_points: bool):
     """Plot a parameter of a fit against time."""
     line_spec = get_line_spec(show_points)
     plt.plot(data[:, 0], data[:, 1], line_spec)
@@ -85,7 +90,7 @@ def plot_parameter(data, fit_parameter, peak_name, show_points):
     plt.show()
 
 
-def get_line_spec(show_points):
+def get_line_spec(show_points: bool) -> str:
     """Determine how the data points are shown with and without the raw data."""
     if show_points:
         return "-x"

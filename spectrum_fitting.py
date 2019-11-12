@@ -165,17 +165,17 @@ class FitSpectrum:
         rad = [0, 1]
         plotting.plot_polar_heatmap(num_cakes, rad, z_data, self.first_cake_angle)
 
-    def plot(self, cakes_to_plot: Union[int, List[int]], x_min: float = 0, x_max: float = 10,
+    def plot(self, cakes_to_plot: Union[int, List[int]], x_range: Tuple[float, float] = (0, 10),
              merge_cakes: bool = False, show_points=False):
         """Plot the intensity as a function of two theta for a given cake."""
         if isinstance(cakes_to_plot, int):
             cakes_to_plot = [cakes_to_plot]
         # Get the data to plot
         if merge_cakes:
-            data = self.get_spectrum_subset(cakes_to_plot, (x_min, x_max), True)
+            data = self.get_spectrum_subset(cakes_to_plot, x_range, True)
         else:
             data = self.spectral_data
-        plotting.plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_min, x_max)
+        plotting.plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_range)
 
     def fit_peaks(self, peak_params: Union[PeakParams, List[PeakParams]],
                   cakes: Union[int, List[int]], merge_cakes: bool = False):
