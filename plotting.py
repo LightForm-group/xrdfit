@@ -54,7 +54,17 @@ def plot_spectrum(data, cakes_to_plot, merge_cakes: bool, show_points: bool,
     plt.ylabel('Intensity')
     plt.xlim(x_range[0], x_range[1])
     plt.tight_layout()
-    plt.show()
+
+
+def plot_peak_params(peak_params):
+    for params in peak_params:
+        for param in params.maxima_ranges:
+            if "min" in param:
+                min_x = params.maxima_ranges[param]
+                max_x = params.maxima_ranges[param.replace("min", "max")]
+                plt.axvspan(min_x, max_x, alpha=0.2, color='grey')
+                plt.axvline(min_x, ls="--", color="red")
+                plt.axvline(max_x, ls="--", color="green")
 
 
 def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
