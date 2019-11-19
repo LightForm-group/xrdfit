@@ -37,7 +37,7 @@ def plot_polar_heatmap(num_cakes, rad, z_data, first_cake_angle):
 
 
 def plot_spectrum(data, cakes_to_plot, merge_cakes: bool, show_points: bool,
-                  x_range: Tuple[float, float]):
+                  x_range: Tuple[float, float] = None):
     """Plot a raw spectrum."""
     plt.figure(figsize=(8, 6))
     line_spec = get_line_spec(show_points)
@@ -52,7 +52,8 @@ def plot_spectrum(data, cakes_to_plot, merge_cakes: bool, show_points: bool,
     plt.minorticks_on()
     plt.xlabel(r'Two Theta ($^\circ$)')
     plt.ylabel('Intensity')
-    plt.xlim(x_range[0], x_range[1])
+    if x_range:
+        plt.xlim(x_range[0], x_range[1])
     plt.tight_layout()
 
 
@@ -68,7 +69,8 @@ def plot_peak_params(peak_params):
                 plt.axvline(min_x, ls="--", color="red")
                 plt.axvline(max_x, ls="--", color="green")
                 peak_center = np.mean((max_x,  min_x))
-                plt.text(peak_center, 10, params.name, size=20)
+                bottom, top = plt.ylim()
+                plt.text(peak_center, top, params.name, size=20, ha="center", va="bottom")
 
 
 def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
