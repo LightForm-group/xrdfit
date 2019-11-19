@@ -57,7 +57,7 @@ def plot_spectrum(data, cakes_to_plot, merge_cakes: bool, show_points: bool,
     plt.tight_layout()
 
 
-def plot_peak_params(peak_params):
+def plot_peak_params(peak_params, x_range: Tuple[float, float] = None):
     """Plot a dashed line at the maximum and minimum extent of the provided PeakParams and shade
     the contained area."""
     for params in peak_params:
@@ -71,6 +71,8 @@ def plot_peak_params(peak_params):
                 peak_center = np.mean((max_x,  min_x))
                 bottom, top = plt.ylim()
                 plt.text(peak_center, top, params.name, size=20, ha="center", va="bottom")
+    if x_range:
+        plt.xlim(x_range)
 
 
 def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
