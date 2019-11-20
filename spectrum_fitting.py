@@ -1,9 +1,10 @@
 import bz2
 import glob
 from typing import List, Tuple, Union
+import pprint
 
 import numpy as np
-
+from scipy.signal import find_peaks
 import lmfit
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -54,6 +55,8 @@ class PeakParams:
 
     def __str__(self):
         """String representation of PeakParams, can be copy pasted for instantiation."""
+        if self.maxima_ranges["1_min"] == self.range[0] and self.maxima_ranges["1_max"] == self.range[1]:
+            return f"PeakParams('{self.name}', {self.range})"
         return f"PeakParams('{self.name}', {self.range}, {self.num_maxima}, {self.maxima_ranges})"
 
 
@@ -130,7 +133,8 @@ def guess_params(x_data, y_data, maxima_ranges: dict) -> lmfit.Parameters:
     return params
 
 
-def iteration_callback(params, iter, resid, *args, **kws):
+# noinspection PyUnusedLocal
+def iteration_callback(parameters, iteration_num, residuals, *args, **kws):
     """This method is called on every iteration of the minimisation. This can be used
     to monitor progress."""
     return False
@@ -255,6 +259,49 @@ class FitSpectrum:
             if fit.name == name:
                 return fit
         raise KeyError(f"Fit: '{name}' not found")
+
+    def detect_peaks(self, cakes: Union[int, List[int]],
+                     x_range: Tuple[float, float]) -> List[PeakParams]:
+        sub_spectrum = self.get_spectrum_subset(cakes, x_range, merge_cakes=True)
+
+        # Detect peaks in signal
+        peaks, peak_properties = find_peaks(sub_spectrum[:, 1], height=[None, None],
+                                            prominence=[2, None], width=[1, None])
+
+        # Separate out singlet and multiplet peaks
+        doublet_x_threshold = 15
+        doublet_y_threshold = 3
+        noise_level = np.percentile(sub_spectrum[:, 1], 20)
+        non_singlet_peaks = []
+
+        for peak_num, peak_index in enumerate(peaks):
+            if peak_num + 1 < len(peaks):
+                next_peak_index = peaks[peak_num + 1]
+                if (next_peak_index - peak_index) < doublet_x_threshold:
+                    if np.min(sub_spectrum[peak_index:next_peak_index,
+                              1]) > doublet_y_threshold * noise_level:
+                        non_singlet_peaks.append(peak_num)
+                        non_singlet_peaks.append(peak_num + 1)
+
+        # Build up list of PeakParams
+        peak_params = []
+        # Convert from data indices to two theta values
+        conversion_factor = sub_spectrum[1, 0] - sub_spectrum[0, 0]
+        spectrum_offset = sub_spectrum[0, 0]
+        for peak_num, peak_index in enumerate(peaks):
+            if peak_num not in non_singlet_peaks:
+                half_width = 2 * peak_properties["widths"][peak_num]
+                left = np.floor(peak_index - half_width) * conversion_factor + spectrum_offset
+                right = np.ceil(peak_index + half_width) * conversion_factor + spectrum_offset
+                peak_params.append(PeakParams(str(peak_num), (round(left, 2), round(right, 2))))
+
+        # Print the PeakParams to std out in a copy/pasteable format.
+        print("[", end="")
+        for param in peak_params:
+            if param != peak_params[-1]:
+                print(f"{param},")
+            else:
+                print(f"{param}]")
 
 
 class FittingExperiment:
