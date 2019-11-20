@@ -52,6 +52,10 @@ class PeakParams:
                 if param not in self.maxima_ranges:
                     raise TypeError(f"Maxima descriptor {param} is missing.")
 
+    def __str__(self):
+        """String representation of PeakParams, can be copy pasted for instantiation."""
+        return f"PeakParams('{self.name}', {self.range}, {self.num_maxima}, {self.maxima_ranges})"
+
 
 class PeakFit:
     """An object containing data on the fit to a peak.
