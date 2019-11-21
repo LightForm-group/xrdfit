@@ -1,7 +1,6 @@
 import bz2
 import glob
 from typing import List, Tuple, Union
-import pprint
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -17,18 +16,19 @@ import plotting
 class PeakParams:
     """An object containing information about a peak and its maxima.
     :ivar name: The name of the peak.
-    :ivar range: Where in the spectrum the peak begins and ends.
+    :ivar bounds: Where in the spectrum the peak begins and ends.
     :ivar num_maxima: The number of maxima in this peak.
-    :ivar maxima_ranges: If there is more than one maxima, where each maximum begins and ends."""
-    def __init__(self, name: str, peak_range: Tuple[float, float], num_maxima: int = 1,
-                 maxima_ranges: dict = None):
+    :ivar maxima_locations: If there is more than one maxima, a bounding box for each peak center.
+    """
+    def __init__(self, name: str, peak_bounds: Tuple[float, float], num_maxima: int = 1,
+                 maxima_locations: dict = None):
         self.name = name
-        self.range = peak_range
+        self.bounds = peak_bounds
         self.num_maxima = num_maxima
-        if maxima_ranges:
-            self.maxima_ranges = maxima_ranges
+        if maxima_locations:
+            self.maxima_locations = maxima_locations
         else:
-            self.maxima_ranges = {"1_min": peak_range[0], "1_max": peak_range[1]}
+            self.maxima_locations = {"1_min": peak_bounds[0], "1_max": peak_bounds[1]}
 
         self._check_maxima_ranges()
         self.previous_fit: Union[lmfit.Parameters, None] = None
@@ -50,14 +50,15 @@ class PeakParams:
         for peak_num in range(1, self.num_maxima + 1):
             for min_max in ["min", "max"]:
                 param = f"{peak_num}_{min_max}"
-                if param not in self.maxima_ranges:
+                if param not in self.maxima_locations:
                     raise TypeError(f"Maxima descriptor {param} is missing.")
 
     def __str__(self):
         """String representation of PeakParams, can be copy pasted for instantiation."""
-        if self.maxima_ranges["1_min"] == self.range[0] and self.maxima_ranges["1_max"] == self.range[1]:
-            return f"PeakParams('{self.name}', {self.range})"
-        return f"PeakParams('{self.name}', {self.range}, {self.num_maxima}, {self.maxima_ranges})"
+        if self.maxima_locations["1_min"] == self.bounds[0]:
+            if self.maxima_locations["1_max"] == self.bounds[1]:
+                return f"PeakParams('{self.name}', {self.bounds})"
+        return f"PeakParams('{self.name}', {self.bounds}, {self.num_maxima}, {self.maxima_locations})"
 
 
 class PeakFit:
@@ -123,7 +124,9 @@ def guess_params(x_data, y_data, maxima_ranges: dict) -> lmfit.Parameters:
         maxima_y = y_data[maximum_mask]
         center = maxima_x[np.argmax(maxima_y)]
         sigma = 0.02
-        amplitude = ((max(maxima_y) - min(maxima_y)) * 3) * sigma
+        # Take the maximum height of the peak but the minimum height of the dataset overall
+        # This is because the maximum_mask does not necessarily include baseline points.
+        amplitude = ((max(maxima_y) - min(y_data)) * 3) * sigma
 
         params.add(f"maximum_{index}_center", value=center, min=center - 0.02, max=center + 0.02)
         params.add(f"maximum_{index}_sigma", value=sigma, min=0.01, max=0.02)
@@ -187,11 +190,15 @@ class FitSpectrum:
         plotting.plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_range)
         plt.show()
 
-    def plot_peak_params(self, peak_params: List[PeakParams], cakes_to_plot: Union[int, List[int]],
+    def plot_peak_params(self, peak_params: Union[PeakParams, List[PeakParams]],
+                         cakes_to_plot: Union[int, List[int]],
                          x_range: Tuple[float, float] = (0, 10), merge_cakes: bool = False,
                          show_points=False):
         if isinstance(cakes_to_plot, int):
             cakes_to_plot = [cakes_to_plot]
+        if isinstance(peak_params, PeakParams):
+            peak_params = [peak_params]
+
         # Get the data to plot
         if merge_cakes:
             data = self.get_spectrum_subset(cakes_to_plot, x_range, True)
@@ -217,15 +224,15 @@ class FitSpectrum:
 
         for peak in peak_params:
             new_fit = PeakFit(peak.name)
-            new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.range, merge_cakes)
+            new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.bounds, merge_cakes)
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
                 new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.num_maxima,
-                                           peak.maxima_ranges, peak.previous_fit)
+                                           peak.maxima_locations, peak.previous_fit)
             else:
                 new_fit.cake_numbers = list(map(str, cakes))
                 stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
-                new_fit.result = do_pv_fit(stacked_spectrum, peak.num_maxima, peak.maxima_ranges,
+                new_fit.result = do_pv_fit(stacked_spectrum, peak.num_maxima, peak.maxima_locations,
                                            peak.previous_fit)
             self.fitted_peaks.append(new_fit)
         if self.verbose:
@@ -261,7 +268,7 @@ class FitSpectrum:
         raise KeyError(f"Fit: '{name}' not found")
 
     def detect_peaks(self, cakes: Union[int, List[int]],
-                     x_range: Tuple[float, float]) -> List[PeakParams]:
+                     x_range: Tuple[float, float]):
         sub_spectrum = self.get_spectrum_subset(cakes, x_range, merge_cakes=True)
 
         # Detect peaks in signal
