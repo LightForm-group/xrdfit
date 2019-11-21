@@ -1,6 +1,13 @@
+from typing import Tuple, List, TYPE_CHECKING
+
+import lmfit
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+
+# TYPE_CHECKING is False at runtime but allows Type hints in IDE
+if TYPE_CHECKING:
+    from spectrum_fitting import PeakParams
 
 matplotlib.rc('xtick', labelsize=14)
 matplotlib.rc('ytick', labelsize=14)
@@ -9,7 +16,7 @@ matplotlib.rc('axes', labelsize=20)
 matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
-def plot_polar_heatmap(num_cakes, rad, z_data, first_cake_angle):
+def plot_polar_heatmap(num_cakes: int, rad: np.ndarray, z_data: np.ndarray, first_cake_angle: int):
     """A method for plotting a polar heatmap."""
     azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
     r, theta = np.meshgrid(rad, azm)
@@ -33,7 +40,8 @@ def plot_polar_heatmap(num_cakes, rad, z_data, first_cake_angle):
     plt.show()
 
 
-def plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_min, x_max):
+def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool, show_points: bool,
+                  x_range: Tuple[float, float] = None):
     """Plot a raw spectrum."""
     plt.figure(figsize=(8, 6))
     line_spec = get_line_spec(show_points)
@@ -48,18 +56,41 @@ def plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_min, x_max):
     plt.minorticks_on()
     plt.xlabel(r'Two Theta ($^\circ$)')
     plt.ylabel('Intensity')
-    plt.xlim(x_min, x_max)
+    if x_range:
+        plt.xlim(x_range[0], x_range[1])
     plt.tight_layout()
-    plt.show()
 
 
-def plot_peak_fit(data, cake_numbers, fit_result, fit_name):
+def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, float] = None):
+    """Plot a dashed line at the maximum and minimum extent of the provided PeakParams and shade
+    the contained area."""
+    for params in peak_params:
+        bounds_min = params.bounds[0]
+        bounds_max = params.bounds[1]
+        range_center = (bounds_min + bounds_max) / 2
+        plt.axvline(bounds_min, ls="-", lw=1, color="grey")
+        plt.axvline(bounds_max, ls="-", lw=1, color="grey")
+        plt.axvspan(bounds_min, bounds_max, alpha=0.2, color='grey', hatch="/")
+        for param in params.maxima_locations:
+            if "min" in param:
+                min_x = params.maxima_locations[param]
+                max_x = params.maxima_locations[param.replace("min", "max")]
+                plt.axvline(min_x, ls="--", color="red")
+                plt.axvline(max_x, ls="--", color="green")
+        bottom, top = plt.ylim()
+        plt.text(range_center, top, params.name, size=20, ha="center", va="bottom")
+    if x_range:
+        plt.xlim(x_range)
+
+
+def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
+                  fit_name: str):
     """Plot the result of a peak fit as well as the raw data."""
     plt.figure(figsize=(8, 6))
 
     # First plot the raw data
     for index, cake_num in enumerate(cake_numbers):
-        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label="Cake {}".format(cake_num))
+        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label=f"Cake {cake_num}")
 
     # Now plot the fit
     x_data = np.linspace(np.min(data[:, 0]), np.max(data[:, 0]), 100)
@@ -75,7 +106,7 @@ def plot_peak_fit(data, cake_numbers, fit_result, fit_name):
     plt.show()
 
 
-def plot_parameter(data, fit_parameter, peak_name, show_points):
+def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_points: bool):
     """Plot a parameter of a fit against time."""
     line_spec = get_line_spec(show_points)
     plt.plot(data[:, 0], data[:, 1], line_spec)
@@ -85,7 +116,7 @@ def plot_parameter(data, fit_parameter, peak_name, show_points):
     plt.show()
 
 
-def get_line_spec(show_points):
+def get_line_spec(show_points: bool) -> str:
     """Determine how the data points are shown with and without the raw data."""
     if show_points:
         return "-x"
