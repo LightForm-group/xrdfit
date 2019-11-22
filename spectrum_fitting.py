@@ -15,47 +15,47 @@ import plotting
 
 class PeakParams:
     """An object containing information about a peak and its maxima.
-    :ivar name: The name of the peak.
-    :ivar bounds: Where in the spectrum the peak begins and ends.
-    :ivar num_maxima: The number of maxima in this peak.
-    :ivar maxima_locations: If there is more than one maxima, a bounding box for each peak center.
+    :ivar name: A name for the peak.
+    :ivar peak_bounds: Where in the spectrum the peak begins and ends. The fit will be done over
+    this region.
+    :ivar maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
     """
     def __init__(self, name: str, peak_bounds: Tuple[float, float],
-                 maxima_locations: List[Tuple[float, float]] = None):
+                 maxima_bounds: List[Tuple[float, float]] = None):
         self.name = name
-        self.bounds = peak_bounds
-        if maxima_locations:
-            self.maxima_locations = maxima_locations
-            self._check_maxima_ranges()
+        self.peak_bounds = peak_bounds
+        if maxima_bounds:
+            self.maxima_bounds = maxima_bounds
+            self._check_maxima_bounds()
         else:
-            self.maxima_locations = [peak_bounds]
+            self.maxima_bounds = [peak_bounds]
 
         self.previous_fit: Union[lmfit.Parameters, None] = None
 
-    def set_previous_fit(self, fit_parameters: lmfit.Parameters):
-        """Since the peak center may drift over time the limits must be reset otherwise it
-         will always have the limits from the first fit."""
-        for parameter in fit_parameters:
+    def set_previous_fit(self, previous_fit_parameters: lmfit.Parameters):
+        """When passing the result of a previous fit to the next fit, the peak center may drift
+        over time. The limits for the next fit must be reset otherwise it will always have the
+        limits from the first fit."""
+        for parameter in previous_fit_parameters:
             if "center" in parameter:
-                center_value = fit_parameters[parameter]
+                center_value = previous_fit_parameters[parameter]
                 center_min = center_value - 0.02
                 center_max = center_value + 0.02
-                fit_parameters[parameter].set(value=None, min=center_min, max=center_max)
-        self.previous_fit = fit_parameters
+                previous_fit_parameters[parameter].set(value=None, min=center_min, max=center_max)
+        self.previous_fit = previous_fit_parameters
 
-    def _check_maxima_ranges(self):
-        """Check that the user has provided the correct number of maxima ranges with the right
-        names for the number of peaks to be fitted."""
-        for index, maxima in enumerate(self.maxima_locations):
+    def _check_maxima_bounds(self):
+        """Check that the list of maxima bounds is a list of Tuples of length 2."""
+        for index, maxima in enumerate(self.maxima_bounds):
             if len(maxima) != 2:
                 raise TypeError(f"Maximum location number {index + 1} is incorrect."
                                 "Should be a Tuple[float, float]")
 
     def __str__(self):
         """String representation of PeakParams, can be copy pasted for instantiation."""
-        if self.maxima_locations[0] == self.bounds:
-            return f"PeakParams('{self.name}', {self.bounds})"
-        return f"PeakParams('{self.name}', {self.bounds}, {self.maxima_locations})"
+        if self.maxima_bounds[0] == self.peak_bounds:
+            return f"PeakParams('{self.name}', {self.peak_bounds})"
+        return f"PeakParams('{self.name}', {self.peak_bounds}, {self.maxima_bounds})"
 
 
 class PeakFit:
@@ -127,7 +127,8 @@ def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lm
         # This is because the maximum_mask does not necessarily include baseline points.
         amplitude = ((max(maxima_y) - min(y_data)) * 3) * sigma
 
-        params.add(f"maximum_{index + 1}_center", value=center, min=center - 0.02, max=center + 0.02)
+        params.add(f"maximum_{index + 1}_center", value=center, min=center - 0.02,
+                   max=center + 0.02)
         params.add(f"maximum_{index + 1}_sigma", value=sigma, min=0.01, max=0.02)
         params.add(f"maximum_{index + 1}_fraction", value=0.2, min=0, max=1)
         params.add(f"maximum_{index + 1}_amplitude", value=amplitude, min=0.05)
@@ -223,15 +224,15 @@ class FitSpectrum:
 
         for peak in peak_params:
             new_fit = PeakFit(peak.name)
-            new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.bounds, merge_cakes)
+            new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.peak_bounds, merge_cakes)
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
-                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.maxima_locations,
+                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.maxima_bounds,
                                            peak.previous_fit)
             else:
                 new_fit.cake_numbers = list(map(str, cakes))
                 stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
-                new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima_locations,
+                new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima_bounds,
                                            peak.previous_fit)
             self.fitted_peaks.append(new_fit)
         if self.verbose:
