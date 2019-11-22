@@ -72,11 +72,10 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
         plt.axvline(bounds_max, ls="-", lw=1, color="grey")
         plt.axvspan(bounds_min, bounds_max, alpha=0.2, color='grey', hatch="/")
         for param in params.maxima_locations:
-            if "min" in param:
-                min_x = params.maxima_locations[param]
-                max_x = params.maxima_locations[param.replace("min", "max")]
-                plt.axvline(min_x, ls="--", color="red")
-                plt.axvline(max_x, ls="--", color="green")
+            min_x = param[0]
+            max_x = param[1]
+            plt.axvline(min_x, ls="--", color="red")
+            plt.axvline(max_x, ls="--", color="green")
         bottom, top = plt.ylim()
         plt.text(range_center, top, params.name, size=20, ha="center", va="bottom")
     if x_range:
