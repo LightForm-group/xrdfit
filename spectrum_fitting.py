@@ -188,7 +188,7 @@ class FitSpectrum:
             cakes = [cakes]
 
         if x_range is None:
-            x_range = [0, len(self.spectral_data[:, 0])]
+            x_range = [-np.inf, np.inf]
 
         theta_mask = np.logical_and(self.spectral_data[:, 0] > x_range[0],
                                     self.spectral_data[:, 0] < x_range[1])
