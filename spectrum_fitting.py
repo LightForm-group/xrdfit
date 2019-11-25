@@ -15,50 +15,49 @@ import plotting
 
 class PeakParams:
     """An object containing information about a peak and its maxima.
-    :ivar name: The name of the peak.
-    :ivar bounds: Where in the spectrum the peak begins and ends.
-    :ivar num_maxima: The number of maxima in this peak.
-    :ivar maxima_locations: If there is more than one maxima, a bounding box for each peak center.
+    :ivar name: A name for the peak.
+    :ivar peak_bounds: Where in the spectrum the peak begins and ends. The fit will be done over
+    this region.
+    :ivar maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
     """
-    def __init__(self, name: str, peak_bounds: Tuple[float, float], num_maxima: int = 1,
-                 maxima_locations: dict = None):
+    def __init__(self, name: str, peak_bounds: Tuple[float, float],
+                 maxima_bounds: List[Tuple[float, float]] = None):
         self.name = name
-        self.bounds = peak_bounds
-        self.num_maxima = num_maxima
-        if maxima_locations:
-            self.maxima_locations = maxima_locations
+        self.peak_bounds = peak_bounds
+        if maxima_bounds:
+            self.maxima_bounds = maxima_bounds
+            self._check_maxima_bounds()
         else:
-            self.maxima_locations = {"1_min": peak_bounds[0], "1_max": peak_bounds[1]}
+            self.maxima_bounds = [peak_bounds]
 
-        self._check_maxima_ranges()
-        self.previous_fit: Union[lmfit.Parameters, None] = None
+        self.previous_fit_parameters: Union[lmfit.Parameters, None] = None
 
-    def set_previous_fit(self, fit_parameters: lmfit.Parameters):
-        """Since the peak center may drift over time the limits must be reset otherwise it
-         will always have the limits from the first fit."""
-        for parameter in fit_parameters:
-            if "center" in parameter:
-                center_value = fit_parameters[parameter]
-                center_min = center_value - 0.02
-                center_max = center_value + 0.02
-                fit_parameters[parameter].set(value=None, min=center_min, max=center_max)
-        self.previous_fit = fit_parameters
+    def set_previous_fit(self, previous_fit_parameters: lmfit.Parameters):
+        """When passing the result of a previous fit to the next fit, the peak center may drift
+        over time. The limits for the next fit must be reset otherwise it will always have the
+        limits from the first fit."""
+        for parameter in previous_fit_parameters.values():
+            if "center" in parameter.name:
+                center_value = parameter.value
+                center_range = parameter.max - parameter.min
+                center_min = center_value - (center_range / 2)
+                center_max = center_value + (center_range / 2)
+                previous_fit_parameters.add(parameter.name, value=center_value, min=center_min,
+                                            max=center_max)
+        self.previous_fit_parameters = previous_fit_parameters
 
-    def _check_maxima_ranges(self):
-        """Check that the user has provided the correct number of maxima ranges with the right
-        names for the number of peaks to be fitted."""
-        for peak_num in range(1, self.num_maxima + 1):
-            for min_max in ["min", "max"]:
-                param = f"{peak_num}_{min_max}"
-                if param not in self.maxima_locations:
-                    raise TypeError(f"Maxima descriptor {param} is missing.")
+    def _check_maxima_bounds(self):
+        """Check that the list of maxima bounds is a list of Tuples of length 2."""
+        for index, maxima in enumerate(self.maxima_bounds):
+            if len(maxima) != 2:
+                raise TypeError(f"Maximum location number {index + 1} is incorrect."
+                                "Should be a Tuple[float, float]")
 
     def __str__(self):
         """String representation of PeakParams, can be copy pasted for instantiation."""
-        if self.maxima_locations["1_min"] == self.bounds[0]:
-            if self.maxima_locations["1_max"] == self.bounds[1]:
-                return f"PeakParams('{self.name}', {self.bounds})"
-        return f"PeakParams('{self.name}', {self.bounds}, {self.num_maxima}, {self.maxima_locations})"
+        if self.maxima_bounds[0] == self.peak_bounds:
+            return f"PeakParams('{self.name}', {self.peak_bounds})"
+        return f"PeakParams('{self.name}', {self.peak_bounds}, {self.maxima_bounds})"
 
 
 class PeakFit:
@@ -81,7 +80,7 @@ class PeakFit:
             plotting.plot_peak_fit(self.raw_spectrum, self.cake_numbers, self.result, self.name)
 
 
-def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
+def do_pv_fit(peak_data: np.ndarray, maxima_locations: List[Tuple[float, float]],
               fit_parameters: lmfit.Parameters = None):
     """
     Pseudo-Voigt fit to the lattice plane peak intensity.
@@ -91,6 +90,8 @@ def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
     """
     model = None
     peak_prefix = "maximum_{}_"
+
+    num_maxima = len(maxima_locations)
 
     for maxima_num in range(num_maxima):
         # Add the peak to the model
@@ -104,7 +105,7 @@ def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
     intensity = peak_data[:, 1]
 
     if not fit_parameters:
-        fit_parameters = guess_params(two_theta, intensity, maxima_ranges)
+        fit_parameters = guess_params(two_theta, intensity, maxima_locations)
 
     fit_result = model.fit(intensity, fit_parameters, x=two_theta,
                            fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
@@ -112,26 +113,29 @@ def do_pv_fit(peak_data: np.ndarray, num_maxima: int, maxima_ranges: dict,
     return fit_result
 
 
-def guess_params(x_data, y_data, maxima_ranges: dict) -> lmfit.Parameters:
+def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lmfit.Parameters:
     """Given a dataset and some details about where the maxima are, guess some good initial
     values for the PV fit."""
     params = lmfit.Parameters()
-    num_maxima = len(maxima_ranges) // 2
-    for index in range(1, num_maxima + 1):
-        maximum_mask = np.logical_and(x_data < maxima_ranges[f"{index}_max"],
-                                      x_data > maxima_ranges[f"{index}_min"])
+
+    for index, maximum in enumerate(maxima_ranges):
+        maximum_mask = np.logical_and(x_data > maximum[0],
+                                      x_data < maximum[1])
         maxima_x = x_data[maximum_mask]
         maxima_y = y_data[maximum_mask]
         center = maxima_x[np.argmax(maxima_y)]
+
+        # Sigma is approximately 0.5 * FWHM.
         sigma = 0.02
         # Take the maximum height of the peak but the minimum height of the dataset overall
         # This is because the maximum_mask does not necessarily include baseline points.
         amplitude = ((max(maxima_y) - min(y_data)) * 3) * sigma
 
-        params.add(f"maximum_{index}_center", value=center, min=center - 0.02, max=center + 0.02)
-        params.add(f"maximum_{index}_sigma", value=sigma, min=0.01, max=0.02)
-        params.add(f"maximum_{index}_fraction", value=0.2, min=0, max=1)
-        params.add(f"maximum_{index}_amplitude", value=amplitude, min=0.05)
+        params.add(f"maximum_{index + 1}_center", value=center, min=maximum[0],
+                   max=maximum[1])
+        params.add(f"maximum_{index + 1}_sigma", value=sigma, min=0.01, max=0.02)
+        params.add(f"maximum_{index + 1}_fraction", value=0.2, min=0, max=1)
+        params.add(f"maximum_{index + 1}_amplitude", value=amplitude, min=0.05)
     params.add("background", value=min(y_data), min=0, max=max(y_data))
     return params
 
@@ -224,16 +228,16 @@ class FitSpectrum:
 
         for peak in peak_params:
             new_fit = PeakFit(peak.name)
-            new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.bounds, merge_cakes)
+            new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.peak_bounds, merge_cakes)
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
-                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.num_maxima,
-                                           peak.maxima_locations, peak.previous_fit)
+                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.maxima_bounds,
+                                           peak.previous_fit_parameters)
             else:
                 new_fit.cake_numbers = list(map(str, cakes))
                 stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
-                new_fit.result = do_pv_fit(stacked_spectrum, peak.num_maxima, peak.maxima_locations,
-                                           peak.previous_fit)
+                new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima_bounds,
+                                           peak.previous_fit_parameters)
             self.fitted_peaks.append(new_fit)
         if self.verbose:
             print("Fitting complete.")
@@ -318,7 +322,7 @@ class FittingExperiment:
     :ivar first_cake_angle:"""
     def __init__(self, spectrum_time: int, file_string: str, first_cake_angle: int,
                  cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
-                 merge_cakes: bool, frames_to_load: List[int] = None, reuse_fits=False):
+                 merge_cakes: bool, frames_to_load: List[int] = None):
         self.spectrum_time = spectrum_time
         self.file_string = file_string
         self.first_cake_angle = first_cake_angle
@@ -328,11 +332,10 @@ class FittingExperiment:
         self.peak_params = peak_params
         self.merge_cakes = merge_cakes
         self.frames_to_load = frames_to_load
-        self.reuse_fits = reuse_fits
 
         self.timesteps: List[FitSpectrum] = []
 
-    def run_analysis(self):
+    def run_analysis(self, reuse_fits=False):
         """Iterate a fit over multiple diffraction patterns."""
         if self.frames_to_load:
             file_list = [self.file_string.format(number) for number in self.frames_to_load]
@@ -345,7 +348,7 @@ class FittingExperiment:
             spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes)
             self.timesteps.append(spectral_data)
 
-            if self.reuse_fits:
+            if reuse_fits:
                 # Pass the results of the fit on to the next time step.
                 for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
                     peak_params.set_previous_fit(peak_fit.result.params)

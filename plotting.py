@@ -16,7 +16,7 @@ matplotlib.rc('axes', labelsize=20)
 matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
-def plot_polar_heatmap(num_cakes: int, rad: np.ndarray, z_data: np.ndarray, first_cake_angle: int):
+def plot_polar_heatmap(num_cakes: int, rad: List[int], z_data: np.ndarray, first_cake_angle: int):
     """A method for plotting a polar heatmap."""
     azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
     r, theta = np.meshgrid(rad, azm)
@@ -65,18 +65,17 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
     """Plot a dashed line at the maximum and minimum extent of the provided PeakParams and shade
     the contained area."""
     for params in peak_params:
-        bounds_min = params.bounds[0]
-        bounds_max = params.bounds[1]
+        bounds_min = params.peak_bounds[0]
+        bounds_max = params.peak_bounds[1]
         range_center = (bounds_min + bounds_max) / 2
         plt.axvline(bounds_min, ls="-", lw=1, color="grey")
         plt.axvline(bounds_max, ls="-", lw=1, color="grey")
         plt.axvspan(bounds_min, bounds_max, alpha=0.2, color='grey', hatch="/")
-        for param in params.maxima_locations:
-            if "min" in param:
-                min_x = params.maxima_locations[param]
-                max_x = params.maxima_locations[param.replace("min", "max")]
-                plt.axvline(min_x, ls="--", color="red")
-                plt.axvline(max_x, ls="--", color="green")
+        for param in params.maxima_bounds:
+            min_x = param[0]
+            max_x = param[1]
+            plt.axvline(min_x, ls="--", color="red")
+            plt.axvline(max_x, ls="--", color="green")
         bottom, top = plt.ylim()
         plt.text(range_center, top, params.name, size=20, ha="center", va="bottom")
     if x_range:
