@@ -181,7 +181,7 @@ class FitSpectrum:
         rad = [0, 1]
         plotting.plot_polar_heatmap(num_cakes, rad, z_data, self.first_cake_angle)
 
-    def plot(self, cakes_to_plot: Union[int, List[int]], x_range: Tuple[float, float] = (0, 10),
+    def plot(self, cakes_to_plot: Union[int, List[int]], x_range: Tuple[float, float] = None,
              merge_cakes: bool = False, show_points=False):
         """Plot the intensity as a function of two theta for a given cake."""
         if isinstance(cakes_to_plot, int):
@@ -242,18 +242,22 @@ class FitSpectrum:
         if self.verbose:
             print("Fitting complete.")
 
-    def get_spectrum_subset(self, cakes: Union[int, List[int]], two_theta_lims: Tuple[float, float],
+    def get_spectrum_subset(self, cakes: Union[int, List[int]],
+                            x_range: Union[None, Tuple[float, float]],
                             merge_cakes: bool) -> np.ndarray:
         """Return spectral intensity as a function of 2-theta for a selected 2-theta range.
         :param cakes: One or more cakes to get the intensity for.
-        :param two_theta_lims: Limits to the two-theta values returned.
+        :param x_range: Limits to the two-theta values returned.
         :param merge_cakes: If more than one cake and True, sum the values of all of the cakes
         else return one column for each cake."""
         if isinstance(cakes, int):
             cakes = [cakes]
 
-        theta_mask = np.logical_and(self.spectral_data[:, 0] > two_theta_lims[0],
-                                    self.spectral_data[:, 0] < two_theta_lims[1])
+        if x_range is None:
+            x_range = [0, len(self.spectral_data[:, 0])]
+
+        theta_mask = np.logical_and(self.spectral_data[:, 0] > x_range[0],
+                                    self.spectral_data[:, 0] < x_range[1])
         if merge_cakes:
             # Returns 2 columns, the two-theta angles and the summed intensity
             data = np.sum(self.spectral_data[:, cakes], axis=1)
