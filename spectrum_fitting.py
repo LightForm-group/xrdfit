@@ -308,12 +308,17 @@ class FitSpectrum:
         peak_params = []
         # Convert from data indices to two theta values
         conversion_factor = sub_spectrum[1, 0] - sub_spectrum[0, 0]
+        # The offset of the whole spectrum from 0.
         spectrum_offset = sub_spectrum[0, 0]
+        # A constant factor determining how wide the peak_bounds of PeakParams are set
+        constant_factor = 1.5
         for peak_num, peak_index in enumerate(peaks):
             if peak_num not in non_singlet_peaks:
                 half_width = 2 * peak_properties["widths"][peak_num]
-                left = np.floor(peak_index - half_width) * conversion_factor + spectrum_offset
-                right = np.ceil(peak_index + half_width) * conversion_factor + spectrum_offset
+                left_offset = np.floor(peak_index - half_width * constant_factor)
+                left = left_offset * conversion_factor + spectrum_offset
+                right_offset = np.ceil(peak_index + half_width * constant_factor)
+                right = right_offset * conversion_factor + spectrum_offset
                 peak_params.append(PeakParams(str(peak_num), (round(left, 2), round(right, 2))))
 
         # Print the PeakParams to std out in a copy/pasteable format.
