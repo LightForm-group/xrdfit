@@ -276,7 +276,7 @@ class FitSpectrum:
         raise KeyError(f"Fit: '{name}' not found")
 
     def detect_peaks(self, cakes: Union[int, List[int]],
-                     x_range: Tuple[float, float]):
+                     x_range: Tuple[float, float] = None) -> List[PeakParams]:
         sub_spectrum = self.get_spectrum_subset(cakes, x_range, merge_cakes=True)
 
         # Detect peaks in signal
@@ -317,6 +317,8 @@ class FitSpectrum:
                 print(f"{param},")
             else:
                 print(f"{param}]")
+
+        return peak_params
 
 
 class FittingExperiment:
