@@ -196,7 +196,7 @@ class FitSpectrum:
 
     def plot_peak_params(self, peak_params: Union[PeakParams, List[PeakParams]],
                          cakes_to_plot: Union[int, List[int]],
-                         x_range: Tuple[float, float] = (0, 10), merge_cakes: bool = False,
+                         x_range: Tuple[float, float] = None, merge_cakes: bool = False,
                          show_points=False):
         if isinstance(cakes_to_plot, int):
             cakes_to_plot = [cakes_to_plot]
@@ -277,16 +277,22 @@ class FitSpectrum:
 
     def detect_peaks(self, cakes: Union[int, List[int]],
                      x_range: Tuple[float, float] = None) -> List[PeakParams]:
+        """
+        All parameters in this function should be in units of data points and so
+        agnostic to the scale of the dataset being analysed. It will however be affected
+        by the density of the data points.
+        """
         sub_spectrum = self.get_spectrum_subset(cakes, x_range, merge_cakes=True)
+
+        noise_level = np.percentile(sub_spectrum[:, 1], 20)
 
         # Detect peaks in signal
         peaks, peak_properties = find_peaks(sub_spectrum[:, 1], height=[None, None],
-                                            prominence=[2, None], width=[1, None])
+                                            prominence=[0.6 * noise_level, None], width=[1, None])
 
         # Separate out singlet and multiplet peaks
         doublet_x_threshold = 15
         doublet_y_threshold = 3
-        noise_level = np.percentile(sub_spectrum[:, 1], 20)
         non_singlet_peaks = []
 
         for peak_num, peak_index in enumerate(peaks):
