@@ -218,11 +218,11 @@ class FitSpectrum:
         """
         sub_spectrum = self.get_spectrum_subset(cakes, x_range, merge_cakes=True)
 
-        noise_level = np.percentile(sub_spectrum[:, 1], 20)
+        noise_level = np.percentile(sub_spectrum[:, 1], 40)
 
         # Detect peaks in signal
         peaks, peak_properties = find_peaks(sub_spectrum[:, 1], height=[None, None],
-                                            prominence=[0.6 * noise_level, None], width=[1, None])
+                                            prominence=[1 * noise_level, None], width=[1, None])
 
         # Separate out singlet and multiplet peaks
         doublet_x_threshold = 15
