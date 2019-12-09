@@ -11,6 +11,7 @@ import pandas as pd
 import dill
 
 import plotting
+from pv_fit import do_pv_fit
 
 
 class PeakParams:
@@ -80,73 +81,6 @@ class PeakFit:
             plotting.plot_peak_fit(self.raw_spectrum, self.cake_numbers, self.result, self.name)
 
 
-def do_pv_fit(peak_data: np.ndarray, maxima_locations: List[Tuple[float, float]],
-              fit_parameters: lmfit.Parameters = None):
-    """
-    Pseudo-Voigt fit to the lattice plane peak intensity.
-    Return results of the fit as an lmfit class, which contains the fitted parameters
-    (amplitude, fwhm, etc.) and the fit line calculated using the fit parameters and
-    100x two-theta points.
-    """
-    model = None
-    peak_prefix = "maximum_{}_"
-
-    num_maxima = len(maxima_locations)
-
-    for maxima_num in range(num_maxima):
-        # Add the peak to the model
-        if model:
-            model += lmfit.models.PseudoVoigtModel(prefix=peak_prefix.format(maxima_num + 1))
-        else:
-            model = lmfit.models.PseudoVoigtModel(prefix=peak_prefix.format(maxima_num + 1))
-    model += lmfit.Model(lambda background: background)
-
-    two_theta = peak_data[:, 0]
-    intensity = peak_data[:, 1]
-
-    if not fit_parameters:
-        fit_parameters = guess_params(two_theta, intensity, maxima_locations)
-
-    fit_result = model.fit(intensity, fit_parameters, x=two_theta,
-                           fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
-
-    return fit_result
-
-
-def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lmfit.Parameters:
-    """Given a dataset and some details about where the maxima are, guess some good initial
-    values for the PV fit."""
-    params = lmfit.Parameters()
-
-    for index, maximum in enumerate(maxima_ranges):
-        maximum_mask = np.logical_and(x_data > maximum[0],
-                                      x_data < maximum[1])
-        maxima_x = x_data[maximum_mask]
-        maxima_y = y_data[maximum_mask]
-        center = maxima_x[np.argmax(maxima_y)]
-
-        # Sigma is approximately 0.5 * FWHM.
-        sigma = 0.02
-        # Take the maximum height of the peak but the minimum height of the dataset overall
-        # This is because the maximum_mask does not necessarily include baseline points.
-        amplitude = ((max(maxima_y) - min(y_data)) * 3) * sigma
-
-        params.add(f"maximum_{index + 1}_center", value=center, min=maximum[0],
-                   max=maximum[1])
-        params.add(f"maximum_{index + 1}_sigma", value=sigma, min=0.01, max=0.02)
-        params.add(f"maximum_{index + 1}_fraction", value=0.2, min=0, max=1)
-        params.add(f"maximum_{index + 1}_amplitude", value=amplitude, min=0.05)
-    params.add("background", value=min(y_data), min=0, max=max(y_data))
-    return params
-
-
-# noinspection PyUnusedLocal
-def iteration_callback(parameters, iteration_num, residuals, *args, **kws):
-    """This method is called on every iteration of the minimisation. This can be used
-    to monitor progress."""
-    return False
-
-
 class FitSpectrum:
     """An object that handles fitting peaks in a spectrum.
     :ivar verbose: Whether or not to print fit status to the console.
@@ -181,7 +115,7 @@ class FitSpectrum:
         rad = [0, 1]
         plotting.plot_polar_heatmap(num_cakes, rad, z_data, self.first_cake_angle)
 
-    def plot(self, cakes_to_plot: Union[int, List[int]], x_range: Tuple[float, float] = (0, 10),
+    def plot(self, cakes_to_plot: Union[int, List[int]], x_range: Tuple[float, float] = None,
              merge_cakes: bool = False, show_points=False):
         """Plot the intensity as a function of two theta for a given cake."""
         if isinstance(cakes_to_plot, int):
@@ -196,7 +130,7 @@ class FitSpectrum:
 
     def plot_peak_params(self, peak_params: Union[PeakParams, List[PeakParams]],
                          cakes_to_plot: Union[int, List[int]],
-                         x_range: Tuple[float, float] = (0, 10), merge_cakes: bool = False,
+                         x_range: Tuple[float, float] = None, merge_cakes: bool = False,
                          show_points=False):
         if isinstance(cakes_to_plot, int):
             cakes_to_plot = [cakes_to_plot]
@@ -242,18 +176,22 @@ class FitSpectrum:
         if self.verbose:
             print("Fitting complete.")
 
-    def get_spectrum_subset(self, cakes: Union[int, List[int]], two_theta_lims: Tuple[float, float],
+    def get_spectrum_subset(self, cakes: Union[int, List[int]],
+                            x_range: Union[None, Tuple[float, float]],
                             merge_cakes: bool) -> np.ndarray:
         """Return spectral intensity as a function of 2-theta for a selected 2-theta range.
         :param cakes: One or more cakes to get the intensity for.
-        :param two_theta_lims: Limits to the two-theta values returned.
+        :param x_range: Limits to the two-theta values returned.
         :param merge_cakes: If more than one cake and True, sum the values of all of the cakes
         else return one column for each cake."""
         if isinstance(cakes, int):
             cakes = [cakes]
 
-        theta_mask = np.logical_and(self.spectral_data[:, 0] > two_theta_lims[0],
-                                    self.spectral_data[:, 0] < two_theta_lims[1])
+        if x_range is None:
+            x_range = [-np.inf, np.inf]
+
+        theta_mask = np.logical_and(self.spectral_data[:, 0] > x_range[0],
+                                    self.spectral_data[:, 0] < x_range[1])
         if merge_cakes:
             # Returns 2 columns, the two-theta angles and the summed intensity
             data = np.sum(self.spectral_data[:, cakes], axis=1)
@@ -272,17 +210,23 @@ class FitSpectrum:
         raise KeyError(f"Fit: '{name}' not found")
 
     def detect_peaks(self, cakes: Union[int, List[int]],
-                     x_range: Tuple[float, float]):
+                     x_range: Tuple[float, float] = None) -> List[PeakParams]:
+        """
+        All parameters in this function should be in units of data points and so
+        agnostic to the scale of the dataset being analysed. It will however be affected
+        by the density of the data points.
+        """
         sub_spectrum = self.get_spectrum_subset(cakes, x_range, merge_cakes=True)
+
+        noise_level = np.percentile(sub_spectrum[:, 1], 40)
 
         # Detect peaks in signal
         peaks, peak_properties = find_peaks(sub_spectrum[:, 1], height=[None, None],
-                                            prominence=[2, None], width=[1, None])
+                                            prominence=[1 * noise_level, None], width=[1, None])
 
         # Separate out singlet and multiplet peaks
         doublet_x_threshold = 15
         doublet_y_threshold = 3
-        noise_level = np.percentile(sub_spectrum[:, 1], 20)
         non_singlet_peaks = []
 
         for peak_num, peak_index in enumerate(peaks):
@@ -298,12 +242,17 @@ class FitSpectrum:
         peak_params = []
         # Convert from data indices to two theta values
         conversion_factor = sub_spectrum[1, 0] - sub_spectrum[0, 0]
+        # The offset of the whole spectrum from 0.
         spectrum_offset = sub_spectrum[0, 0]
+        # A constant factor determining how wide the peak_bounds of PeakParams are set
+        constant_factor = 1.5
         for peak_num, peak_index in enumerate(peaks):
             if peak_num not in non_singlet_peaks:
                 half_width = 2 * peak_properties["widths"][peak_num]
-                left = np.floor(peak_index - half_width) * conversion_factor + spectrum_offset
-                right = np.ceil(peak_index + half_width) * conversion_factor + spectrum_offset
+                left_offset = np.floor(peak_index - half_width * constant_factor)
+                left = left_offset * conversion_factor + spectrum_offset
+                right_offset = np.ceil(peak_index + half_width * constant_factor)
+                right = right_offset * conversion_factor + spectrum_offset
                 peak_params.append(PeakParams(str(peak_num), (round(left, 2), round(right, 2))))
 
         # Print the PeakParams to std out in a copy/pasteable format.
@@ -313,6 +262,8 @@ class FitSpectrum:
                 print(f"{param},")
             else:
                 print(f"{param}]")
+
+        return peak_params
 
 
 class FittingExperiment:

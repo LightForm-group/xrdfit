@@ -1,4 +1,4 @@
-from typing import Tuple, List, TYPE_CHECKING
+from typing import Tuple, List, Union, TYPE_CHECKING
 
 import lmfit
 import numpy as np
@@ -41,7 +41,7 @@ def plot_polar_heatmap(num_cakes: int, rad: List[int], z_data: np.ndarray, first
 
 
 def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool, show_points: bool,
-                  x_range: Tuple[float, float] = None):
+                  x_range: Union[None, Tuple[float, float]] = None):
     """Plot a raw spectrum."""
     plt.figure(figsize=(8, 6))
     line_spec = get_line_spec(show_points)
