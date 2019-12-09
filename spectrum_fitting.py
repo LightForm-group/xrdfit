@@ -5,7 +5,7 @@ from typing import List, Tuple, Union
 import numpy as np
 from scipy.signal import find_peaks
 import lmfit
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
 import dill
