@@ -306,10 +306,11 @@ class FittingExperiment:
             spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes)
             self.timesteps.append(spectral_data)
 
-            if reuse_fits:
-                # Pass the results of the fit on to the next time step.
-                for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
+            # Prepare the PeakParams for the next time step.
+            for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
+                if reuse_fits:
                     peak_params.set_previous_fit(peak_fit.result.params)
+            self.adjust_peak_bounds(spectral_data.fitted_peaks)
 
         print("Analysis complete.")
 
@@ -361,6 +362,19 @@ class FittingExperiment:
         with bz2.open(file_name, 'wb') as output_file:
             dill.dump(self, output_file)
         print("Data successfully saved to dump file.")
+
+    def adjust_peak_bounds(self, fitted_peaks: List[PeakFit]):
+        """Adjust peak bounds to re-center the peak in the peak bounds."""
+
+        for peak_fit, peak_param in zip(fitted_peaks, self.peak_params):
+            centers = []
+            for name in peak_fit.result.params:
+                if "center" in name:
+                    centers.append(peak_fit.result.params[name].value)
+            center = sum(centers) / len(centers)
+
+            bound_width = peak_param.peak_bounds[1] - peak_param.peak_bounds[0]
+            peak_param.peak_bounds = (center - (bound_width / 2), center + (bound_width / 2))
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
