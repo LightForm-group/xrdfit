@@ -5,7 +5,7 @@ from typing import List, Tuple, Union
 import numpy as np
 from scipy.signal import find_peaks
 import lmfit
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import pandas as pd
 import dill
@@ -150,7 +150,7 @@ class FitSpectrum:
             padding = bound_range / 10
             x_range = (min_bound - padding, max_bound + padding)
         plotting.plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_range)
-        plotting.plot_peak_params(peak_params)
+        plotting.plot_peak_params(peak_params, x_range)
         plt.show()
 
     def fit_peaks(self, peak_params: Union[PeakParams, List[PeakParams]],
