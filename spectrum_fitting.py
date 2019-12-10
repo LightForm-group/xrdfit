@@ -142,6 +142,13 @@ class FitSpectrum:
             data = self.get_spectrum_subset(cakes_to_plot, x_range, True)
         else:
             data = self.spectral_data
+        if x_range is None:
+            bounds = [param.peak_bounds for param in peak_params]
+            min_bound = min(bounds)[0]
+            max_bound = max(bounds, key=lambda x: x[1])[1]
+            bound_range = max_bound - min_bound
+            padding = bound_range / 10
+            x_range = (min_bound - padding, max_bound + padding)
         plotting.plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_range)
         plotting.plot_peak_params(peak_params)
         plt.show()
