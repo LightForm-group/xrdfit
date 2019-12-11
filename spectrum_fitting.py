@@ -54,8 +54,9 @@ class PeakParams:
                 raise TypeError(f"Maximum location number {index + 1} is incorrect."
                                 "Should be a Tuple[float, float]")
 
-    def __str__(self):
-        """String representation of PeakParams, can be copy pasted for instantiation."""
+    def __str__(self) -> str:
+        """String representation of PeakParams which can be copy pasted for instantiation of new
+        PeakParams."""
         if self.maxima_bounds[0] == self.peak_bounds:
             return f"PeakParams('{self.name}', {self.peak_bounds})"
         return f"PeakParams('{self.name}', {self.peak_bounds}, {self.maxima_bounds})"
@@ -315,36 +316,35 @@ class FittingExperiment:
         print("Analysis complete.")
 
     def peak_names(self) -> List[str]:
-        """List the peaks that have been fitted."""
+        """List the peaks specified for fitting in the PeakParams."""
         return [peak.name for peak in self.peak_params]
 
-    def fit_parameters(self, peak_name) -> List[str]:
+    def fit_parameters(self, peak_name: str) -> List[str]:
         """List the parameters of the fit for a specified peak.
         :param peak_name: The peak to list the parameters of.
         """
-        return self.timesteps[0].get_fit(peak_name).result.var_names
+        if self.timesteps:
+            return self.timesteps[0].get_fit(peak_name).result.var_names
 
-    def get_fit_parameter(self, peak_name: str,
-                          fit_parameter: str) -> Union[None, np.ndarray]:
-        """Get a fitting parameter over time."""
-        if peak_name in [peak.name for peak in self.peak_params]:
-            if fit_parameter in self.fit_parameters(peak_name):
-                parameters = []
-                for timestep in self.timesteps:
-                    peak_fit = timestep.get_fit(peak_name)
-                    parameters.append(peak_fit.result.params[fit_parameter])
-                if self.frames_to_load:
-                    x_data = np.array(self.frames_to_load) * self.spectrum_time
-                else:
-                    x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
-                data = np.vstack((x_data, parameters)).T
-                return data
-            else:
-                print("Unknown fit parameter {} for peak {}".format(fit_parameter, peak_name))
-                return None
-        else:
+    def get_fit_parameter(self, peak_name: str, fit_parameter: str) -> Union[None, np.ndarray]:
+        """Get the raw values of a fitting parameter over time."""
+        if peak_name not in [peak.name for peak in self.peak_params]:
             print("Peak '{}' not found in fitted peaks.")
             return None
+        if fit_parameter not in self.fit_parameters(peak_name):
+            print(f"Unknown fit parameter {fit_parameter} for peak {peak_name}")
+            return None
+
+        parameters = []
+        for timestep in self.timesteps:
+            peak_fit = timestep.get_fit(peak_name)
+            parameters.append(peak_fit.result.params[fit_parameter])
+        if self.frames_to_load:
+            x_data = np.array(self.frames_to_load) * self.spectrum_time
+        else:
+            x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
+        data = np.vstack((x_data, parameters)).T
+        return data
 
     def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False):
         """Plot a named parameter of a fit as a function of time.
@@ -357,7 +357,7 @@ class FittingExperiment:
             plotting.plot_parameter(data, fit_parameter, peak_name, show_points)
 
     def save(self, file_name: str):
-        """Dump the object to a compressed binary file using dill."""
+        """Dump the data and all fits to a compressed binary file using dill."""
         print("Saving data to dump file.")
         with bz2.open(file_name, 'wb') as output_file:
             dill.dump(self, output_file)
@@ -365,7 +365,6 @@ class FittingExperiment:
 
     def adjust_peak_bounds(self, fitted_peaks: List[PeakFit]):
         """Adjust peak bounds to re-center the peak in the peak bounds."""
-
         for peak_fit, peak_param in zip(fitted_peaks, self.peak_params):
             centers = []
             for name in peak_fit.result.params:
@@ -390,7 +389,7 @@ def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
 
 
 def load_dump(file_name: str) -> FittingExperiment:
-    """Load a FittingExperiment object saved using the FittingExperiment.save method."""
+    """Load a FittingExperiment object saved using the FittingExperiment.save() method."""
     print("Loading data from dump file.")
     with bz2.open(file_name, "rb") as input_file:
         data = dill.load(input_file)
