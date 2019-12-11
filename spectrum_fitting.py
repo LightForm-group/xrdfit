@@ -129,6 +129,12 @@ class FitSpectrum:
         plotting.plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_range)
         plt.show()
 
+    def plot_fit(self, fit_name: str):
+        """Plot the result of a fit.
+        :param fit_name: The name of the fit to plot."""
+        fit = self.get_fit(fit_name)
+        fit.plot()
+
     def plot_peak_params(self, peak_params: Union[PeakParams, List[PeakParams]],
                          cakes_to_plot: Union[int, List[int]],
                          x_range: Tuple[float, float] = None, merge_cakes: bool = False,
@@ -356,7 +362,7 @@ class FittingExperiment:
         if data is not None:
             plotting.plot_parameter(data, fit_parameter, peak_name, show_points)
 
-    def plot_fits(self, num_timesteps: int = 10, peak_names: Union[List[str], str] = None,
+    def plot_fits(self, num_timesteps: int = 5, peak_names: Union[List[str], str] = None,
                   timesteps: List[int] = None):
         """Plot the calculated fits to the data.
         :param num_timesteps: The number of timesteps to plot fits for. The function will plot this
@@ -371,7 +377,8 @@ class FittingExperiment:
         if peak_names is None:
             peak_names = self.peak_names()
         for timestep in timesteps:
-            pass
+            for name in peak_names:
+                self.timesteps[timestep].plot_fit(name)
 
     def _calculate_timesteps(self, num_timesteps: int) -> List[int]:
         """Work out which timesteps to plot."""
