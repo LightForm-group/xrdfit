@@ -61,7 +61,7 @@ def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool,
     plt.tight_layout()
 
 
-def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, float] = None):
+def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, float]):
     """Plot a dashed line at the maximum and minimum extent of the provided PeakParams and shade
     the contained area."""
     for params in peak_params:
@@ -77,8 +77,8 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
             plt.axvline(min_x, ls="--", color="red")
             plt.axvline(max_x, ls="--", color="green")
         bottom, top = plt.ylim()
-        plt.text(range_center, top, params.name, size=20, ha="center", va="bottom")
-    if x_range:
+        if x_range[0] < range_center < x_range[1]:
+            plt.text(range_center, top, params.name, size=20, ha="center", va="bottom")
         plt.xlim(x_range)
 
 
