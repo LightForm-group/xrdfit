@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='xrd_fit',
+    name='xrd-fit',
     version='0.1',
-    description='A package for automating the fitting of XRD peaks using Pseudo-Voight fits.',
+    description='Automated fitting of XRD peaks using Pseudo-Voight fits',
     author='Peter Crowther',
     packages=find_packages(),
     install_requires=['numpy',
@@ -13,5 +13,6 @@ setup(
                       'tqdm',
                       'scipy',
                       'lmfit'
-                      ]
+                      ],
+    extras_require={"documentation_compilation": "sphinx"}
 )
