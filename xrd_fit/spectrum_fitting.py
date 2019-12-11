@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import dill
 
-import plotting
-from pv_fit import do_pv_fit
+import xrd_fit.plotting as plotting
+from xrd_fit.pv_fit import do_pv_fit
 
 
 class PeakParams:

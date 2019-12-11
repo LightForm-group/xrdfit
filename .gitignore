@@ -8,3 +8,6 @@ __pycache__/
 /example_data/adc_041_7Nb
 /tutorial notebooks/working_copy.ipynb
 /tutorial notebooks/experiment.dump
+
+/docs/html
+/xrd_fit.egg-info
