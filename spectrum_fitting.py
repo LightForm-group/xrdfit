@@ -356,6 +356,31 @@ class FittingExperiment:
         if data is not None:
             plotting.plot_parameter(data, fit_parameter, peak_name, show_points)
 
+    def plot_fits(self, num_timesteps: int = 10, peak_names: Union[List[str], str] = None,
+                  timesteps: List[int] = None):
+        """Plot the calculated fits to the data.
+        :param num_timesteps: The number of timesteps to plot fits for. The function will plot this
+        many timesteps, evenly spaced over the whole dataset. This value is ignored if `timesteps`
+        is specified.
+        :param peak_names: The name of the peak to fit. If not specified, will plot all fitted
+        peaks.
+        :param timesteps: A list of timesteps to plot the fits for."""
+
+        if timesteps is None:
+            timesteps = self._calculate_timesteps(num_timesteps)
+        if peak_names is None:
+            peak_names = self.peak_names()
+        for timestep in timesteps:
+            pass
+
+    def _calculate_timesteps(self, num_timesteps: int) -> List[int]:
+        """Work out which timesteps to plot."""
+        timesteps = np.linspace(0, len(self.timesteps) - 1, num_timesteps)
+        timesteps = list(set(np.round(timesteps)))
+        timesteps = [int(i) for i in timesteps]
+
+        return timesteps
+
     def save(self, file_name: str):
         """Dump the data and all fits to a compressed binary file using dill."""
         print("Saving data to dump file.")
