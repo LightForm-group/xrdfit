@@ -1,0 +1,10 @@
+# This file provides configuration for building the documentation at: https://xrdfit.readthedocs.io/en/latest/index.html
+
+version: 2
+
+python:
+  version: 3.6
+  install:
+    - requirements: requirements.txt
+    - method: setuptools
+      path: .
