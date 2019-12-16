@@ -1,5 +1,5 @@
-import xrd_fit.spectrum_fitting as spectrum_fitting
-from xrd_fit.spectrum_fitting import PeakParams
+import xrdfit.spectrum_fitting as spectrum_fitting
+from xrdfit.spectrum_fitting import PeakParams
 
 
 frame_time = 10

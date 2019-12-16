@@ -7,7 +7,7 @@ import matplotlib
 
 # TYPE_CHECKING is False at runtime but allows Type hints in IDE
 if TYPE_CHECKING:
-    from spectrum_fitting import PeakParams
+    from xrdfit.spectrum_fitting import PeakParams
 
 matplotlib.rc('xtick', labelsize=14)
 matplotlib.rc('ytick', labelsize=14)

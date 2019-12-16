@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='xrd-fit',
+    name='xrdfit',
     version='0.1',
     description='Automated fitting of XRD peaks using Pseudo-Voight fits',
     author='Peter Crowther',
