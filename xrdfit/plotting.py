@@ -1,3 +1,5 @@
+import os
+import pathlib
 from typing import Tuple, List, Union, TYPE_CHECKING
 
 import lmfit
@@ -83,7 +85,7 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
 
 
 def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
-                  fit_name: str):
+                  fit_name: str, timestep: str = None, file_name: str = None):
     """Plot the result of a peak fit as well as the raw data."""
     plt.figure(figsize=(8, 6))
 
@@ -100,9 +102,18 @@ def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.m
     plt.xlabel(r'Two Theta ($^\circ$)')
     plt.ylabel('Intensity')
     plt.legend()
+    if timestep:
+        fit_name = f'Peak "{fit_name}" at t = {timestep}'
     plt.title(fit_name)
     plt.tight_layout()
-    plt.show()
+    if file_name:
+        file_name = pathlib.Path(file_name)
+        if not file_name.parent.exists():
+            os.makedirs(file_name.parent)
+        plt.savefig(file_name)
+    else:
+        plt.show()
+    plt.close()
 
 
 def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_points: bool):
