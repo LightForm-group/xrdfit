@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import dill
 
-import plotting
-from pv_fit import do_pv_fit
+import xrdfit.plotting as plotting
+from xrdfit.pv_fit import do_pv_fit
 
 
 class PeakParams:
@@ -306,6 +306,8 @@ class FittingExperiment:
             file_list = [self.file_string.format(number) for number in self.frames_to_load]
         else:
             file_list = sorted(glob.glob(self.file_string))
+            if len(file_list) == 0:
+                raise FileNotFoundError(f"No files found with file stub: '{self.file_string}'")
 
         print("Processing {} diffraction patterns.".format(len(file_list)))
         for file_path in tqdm(file_list):
