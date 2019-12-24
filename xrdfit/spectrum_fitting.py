@@ -323,6 +323,7 @@ class FittingExperiment:
             for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
                 if reuse_fits:
                     peak_params.set_previous_fit(peak_fit.result.params)
+                self.adjust_maxima_bounds(peak_fit.result, peak_params)
             self.adjust_peak_bounds(spectral_data.fitted_peaks)
 
         print("Analysis complete.")
@@ -418,6 +419,21 @@ class FittingExperiment:
 
             bound_width = peak_param.peak_bounds[1] - peak_param.peak_bounds[0]
             peak_param.peak_bounds = (center - (bound_width / 2), center + (bound_width / 2))
+
+    def adjust_maxima_bounds(self, peak_fit: lmfit.model.ModelResult, peak_params: PeakParams):
+        """Adjust maxima bounds to re-center the maximum in the maximum bounds."""
+        peak_centers = []
+        for param in peak_fit.params:
+            if "center" in param:
+                peak_centers.append(peak_fit.params[param].value)
+
+        new_maxima_bounds = []
+        for center, maximum_bounds in zip(peak_centers, peak_params.maxima_bounds):
+            maximum_bound_width = maximum_bounds[1] - maximum_bounds[0]
+            lower_bound = center - maximum_bound_width / 2
+            upper_bound = center + maximum_bound_width / 2
+            new_maxima_bounds.append((lower_bound, upper_bound))
+        peak_params.maxima_bounds = new_maxima_bounds
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
