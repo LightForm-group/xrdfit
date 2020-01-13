@@ -12,3 +12,4 @@ __pycache__/
 /docs/html
 /plots
 /xrdfit/test.py
+/xrdfit.egg-info

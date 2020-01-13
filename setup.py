@@ -12,7 +12,8 @@ setup(
                       'dill',
                       'tqdm',
                       'scipy',
-                      'lmfit'
+                      'lmfit',
+					  'jupyter',
                       ],
     extras_require={"documentation_compilation": "sphinx"}
 )
