@@ -61,6 +61,32 @@ class PeakParams:
             return f"PeakParams('{self.name}', {self.peak_bounds})"
         return f"PeakParams('{self.name}', {self.peak_bounds}, {self.maxima_bounds})"
 
+    def adjust_peak_bounds(self, fit_params: lmfit.Parameters):
+        """Adjust peak bounds to re-center the peak in the peak bounds."""
+        centers = []
+        for name in fit_params:
+            if "center" in name:
+                centers.append(fit_params[name].value)
+        center = sum(centers) / len(centers)
+
+        bound_width = self.peak_bounds[1] - self.peak_bounds[0]
+        self.peak_bounds = (center - (bound_width / 2), center + (bound_width / 2))
+
+    def adjust_maxima_bounds(self, fit_params: lmfit.Parameters):
+        """Adjust maxima bounds to re-center the maximum in the maximum bounds."""
+        peak_centers = []
+        for param in fit_params:
+            if "center" in param:
+                peak_centers.append(fit_params[param].value)
+
+        new_maxima_bounds = []
+        for center, maximum_bounds in zip(peak_centers, self.maxima_bounds):
+            maximum_bound_width = maximum_bounds[1] - maximum_bounds[0]
+            lower_bound = center - maximum_bound_width / 2
+            upper_bound = center + maximum_bound_width / 2
+            new_maxima_bounds.append((lower_bound, upper_bound))
+        self.maxima_bounds = new_maxima_bounds
+
 
 class PeakFit:
     """An object containing data on the fit to a peak.
@@ -74,12 +100,13 @@ class PeakFit:
         self.result: Union[None, lmfit.model.ModelResult] = None
         self.cake_numbers: List[int] = []
 
-    def plot(self):
+    def plot(self, timestep: str = None, file_name: str = None):
         """ Plot the raw spectral data and the fit."""
         if self.raw_spectrum is None:
             print("Cannot plot fit peak as fitting has not been done yet.")
         else:
-            plotting.plot_peak_fit(self.raw_spectrum, self.cake_numbers, self.result, self.name)
+            plotting.plot_peak_fit(self.raw_spectrum, self.cake_numbers, self.result, self.name,
+                                   timestep, file_name)
 
 
 class FitSpectrum:
@@ -129,11 +156,14 @@ class FitSpectrum:
         plotting.plot_spectrum(data, cakes_to_plot, merge_cakes, show_points, x_range)
         plt.show()
 
-    def plot_fit(self, fit_name: str):
+    def plot_fit(self, fit_name: str, timestep: str = None, file_name: str = None):
         """Plot the result of a fit.
-        :param fit_name: The name of the fit to plot."""
+        :param fit_name: The name of the fit to plot.
+        :param timestep: If provided, the timestep of the fit which will be added to the title.
+        :param file_name: If provided, the stub of the file name to write the plot to, if not
+         provided, the plot will be displayed on screen."""
         fit = self.get_fit(fit_name)
-        fit.plot()
+        fit.plot(timestep, file_name)
 
     def plot_peak_params(self, peak_params: Union[PeakParams, List[PeakParams]],
                          cakes_to_plot: Union[int, List[int]],
@@ -319,7 +349,8 @@ class FittingExperiment:
             for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
                 if reuse_fits:
                     peak_params.set_previous_fit(peak_fit.result.params)
-            self.adjust_peak_bounds(spectral_data.fitted_peaks)
+                peak_params.adjust_maxima_bounds(peak_fit.result.params)
+                peak_params.adjust_peak_bounds(peak_fit.result.params)
 
         print("Analysis complete.")
 
@@ -365,14 +396,16 @@ class FittingExperiment:
             plotting.plot_parameter(data, fit_parameter, peak_name, show_points)
 
     def plot_fits(self, num_timesteps: int = 5, peak_names: Union[List[str], str] = None,
-                  timesteps: List[int] = None):
+                  timesteps: List[int] = None, file_name: str = None):
         """Plot the calculated fits to the data.
         :param num_timesteps: The number of timesteps to plot fits for. The function will plot this
         many timesteps, evenly spaced over the whole dataset. This value is ignored if `timesteps`
         is specified.
         :param peak_names: The name of the peak to fit. If not specified, will plot all fitted
         peaks.
-        :param timesteps: A list of timesteps to plot the fits for."""
+        :param timesteps: A list of timesteps to plot the fits for.
+        :param file_name: If provided, outputs the plot to an image file with filename as the image
+        stub."""
 
         if timesteps is None:
             timesteps = self._calculate_timesteps(num_timesteps)
@@ -380,7 +413,11 @@ class FittingExperiment:
             peak_names = self.peak_names()
         for timestep in timesteps:
             for name in peak_names:
-                self.timesteps[timestep].plot_fit(name)
+                if file_name:
+                    output_name = f"../plots/{file_name}_{name}_{timestep :04d}.png"
+                else:
+                    output_name = None
+                self.timesteps[timestep].plot_fit(name, str(timestep), output_name)
 
     def _calculate_timesteps(self, num_timesteps: int) -> List[int]:
         """Work out which timesteps to plot."""
@@ -396,18 +433,6 @@ class FittingExperiment:
         with bz2.open(file_name, 'wb') as output_file:
             dill.dump(self, output_file)
         print("Data successfully saved to dump file.")
-
-    def adjust_peak_bounds(self, fitted_peaks: List[PeakFit]):
-        """Adjust peak bounds to re-center the peak in the peak bounds."""
-        for peak_fit, peak_param in zip(fitted_peaks, self.peak_params):
-            centers = []
-            for name in peak_fit.result.params:
-                if "center" in name:
-                    centers.append(peak_fit.result.params[name].value)
-            center = sum(centers) / len(centers)
-
-            bound_width = peak_param.peak_bounds[1] - peak_param.peak_bounds[0]
-            peak_param.peak_bounds = (center - (bound_width / 2), center + (bound_width / 2))
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:

@@ -8,6 +8,6 @@ To install as a Python module, type
 from the root directory. 
 For developers, you should install in linked .egg mode using
 
-`python -m pip install . develop`
+`python setup.py develop`
 
 If you are using a Python virtual environment, you should activate this first before using the above commands.

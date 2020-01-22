@@ -10,3 +10,6 @@ __pycache__/
 /tutorial notebooks/experiment.dump
 
 /docs/html
+/plots
+/xrdfit/test.py
+/xrdfit.egg-info
