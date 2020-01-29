@@ -217,6 +217,11 @@ class FitSpectrum:
                 new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima_bounds,
                                            peak.previous_fit_parameters)
             self.fitted_peaks.append(new_fit)
+            if new_fit.result.nfev > 500:
+                print(new_fit.result.init_params)
+                print(new_fit.result.params)
+                new_fit.result.plot_fit(show_init=True, numpoints=500)
+                plt.show()
         if self.verbose:
             print("Fitting complete.")
 

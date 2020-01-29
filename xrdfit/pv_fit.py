@@ -64,7 +64,8 @@ def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lm
 
 
 def guess_sigma(x_data):
-    # Sigma is very approximately 10% of the peak_bounds .
+    # Sigma is half the width of the peak at FHWM
+    # Sigma is very approximately 10% of the peak_bounds.
     sigma = 0.1 * (max(x_data) - min(x_data))
     # The minimum sigma is very approximately 4% of the peak bounds
     min_sigma = 0.04 * (max(x_data) - min(x_data))

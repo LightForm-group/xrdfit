@@ -47,11 +47,15 @@ def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool,
     """Plot a raw spectrum."""
     plt.figure(figsize=(8, 6))
     line_spec = get_line_spec(show_points)
+    if x_range:
+        x_mask = np.logical_and(x_range[0] < data[:, 0], data[:, 0] < x_range[1])
+    else:
+        x_mask = [True] * data.shape[0]
     if merge_cakes:
-        plt.plot(data[:, 0], data[:, 1:], line_spec, linewidth=2)
+        plt.plot(data[x_mask, 0], data[x_mask, 1:], line_spec, linewidth=2)
     else:
         for cake_num in cakes_to_plot:
-            plt.plot(data[:, 0], data[:, cake_num], line_spec, linewidth=2, label=cake_num)
+            plt.plot(data[x_mask, 0], data[x_mask, cake_num], line_spec, linewidth=2, label=cake_num)
         plt.legend()
 
     # Plot formatting
