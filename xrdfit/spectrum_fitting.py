@@ -259,7 +259,7 @@ class FitSpectrum:
         raise KeyError(f"Fit: '{name}' not found")
 
     def detect_peaks(self, cakes: Union[int, List[int]],
-                     x_range: Tuple[float, float] = None) -> List[PeakParams]:
+                     x_range: Tuple[float, float] = None):
         """
         All parameters in this function should be in units of data points and so
         agnostic to the scale of the dataset being analysed. It will however be affected
@@ -311,8 +311,6 @@ class FitSpectrum:
                 print(f"{param},")
             else:
                 print(f"{param}]")
-
-        return peak_params
 
 
 class FittingExperiment:
