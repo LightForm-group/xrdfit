@@ -71,12 +71,12 @@ def guess_sigma(x_data, maximum_range):
     if maximum_range > 0.8 * x_range:
         # If the maximum range is similar to the x_range then we have a single peak. Make
         # assumptions based on data width
-        # Sigma is very approximately 10% of the peak_bounds.
-        sigma = 0.1 * x_range
-        # The minimum sigma is very approximately 4% of the peak bounds
-        min_sigma = 0.04 * x_range
-        # The maximum sigma is very approximately 50% of the peak bounds
-        max_sigma = 0.5 * x_range
+        # Sigma is very approximately 7% of the peak_bounds.
+        sigma = 0.07 * x_range
+        # The minimum sigma is very approximately 2.5% of the peak bounds
+        min_sigma = 0.025 * x_range
+        # The maximum sigma is very approximately 20% of the peak bounds
+        max_sigma = 0.20 * x_range
 
     else:
         # We are dealing with multiple peaks - set sigma to be close to the maxima range
