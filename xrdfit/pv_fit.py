@@ -86,6 +86,7 @@ def guess_sigma(x_data, maximum_range):
 
     return max_sigma, min_sigma, sigma
 
+
 # noinspection PyUnusedLocal
 def iteration_callback(parameters, iteration_num, residuals, *args, **kws):
     """This method is called on every iteration of the minimisation. This can be used
