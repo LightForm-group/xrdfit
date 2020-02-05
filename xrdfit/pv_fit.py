@@ -49,10 +49,10 @@ def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lm
         maxima_y = y_data[maximum_mask]
         center = maxima_x[np.argmax(maxima_y)]
 
-        max_sigma, min_sigma, sigma = guess_sigma(x_data)
+        max_sigma, min_sigma, sigma = guess_sigma(x_data, maximum)
         # Take the maximum height of the peak but the minimum height of the dataset overall
         # This is because the maximum_mask does not necessarily include baseline points.
-        amplitude = ((max(maxima_y) - min(y_data)) * 3) * sigma
+        amplitude = (max(maxima_y) - min(y_data)) * 2 * sigma
 
         params.add(f"maximum_{index + 1}_center", value=center, min=maximum[0],
                    max=maximum[1])
@@ -63,16 +63,28 @@ def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lm
     return params
 
 
-def guess_sigma(x_data):
+def guess_sigma(x_data, maximum_range):
     # Sigma is half the width of the peak at FHWM
-    # Sigma is very approximately 10% of the peak_bounds.
-    sigma = 0.1 * (max(x_data) - min(x_data))
-    # The minimum sigma is very approximately 4% of the peak bounds
-    min_sigma = 0.04 * (max(x_data) - min(x_data))
-    # The maximum sigma is very approximately 50% of the peak bounds
-    max_sigma = 0.5 * (max(x_data) - min(x_data))
-    return max_sigma, min_sigma, sigma
+    x_range = max(x_data) - min(x_data)
+    maximum_range = maximum_range[1] - maximum_range[0]
 
+    if maximum_range > 0.8 * x_range:
+        # If the maximum range is similar to the x_range then we have a single peak. Make
+        # assumptions based on data width
+        # Sigma is very approximately 10% of the peak_bounds.
+        sigma = 0.1 * x_range
+        # The minimum sigma is very approximately 4% of the peak bounds
+        min_sigma = 0.04 * x_range
+        # The maximum sigma is very approximately 50% of the peak bounds
+        max_sigma = 0.5 * x_range
+
+    else:
+        # We are dealing with multiple peaks - set sigma to be close to the maxima range
+        sigma = 0.5 * maximum_range
+        min_sigma = 0.1 * maximum_range
+        max_sigma = 4 * maximum_range
+
+    return max_sigma, min_sigma, sigma
 
 # noinspection PyUnusedLocal
 def iteration_callback(parameters, iteration_num, residuals, *args, **kws):

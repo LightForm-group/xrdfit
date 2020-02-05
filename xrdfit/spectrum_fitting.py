@@ -334,7 +334,7 @@ class FittingExperiment:
 
         self.timesteps: List[FitSpectrum] = []
 
-    def run_analysis(self, reuse_fits=False):
+    def run_analysis(self, reuse_fits=False, debug: bool = False):
         """Iterate a fit over multiple diffraction patterns."""
         if self.frames_to_load:
             file_list = [self.file_string.format(number) for number in self.frames_to_load]
@@ -346,7 +346,7 @@ class FittingExperiment:
         print("Processing {} diffraction patterns.".format(len(file_list)))
         for file_path in tqdm(file_list):
             spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
-            spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes)
+            spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes, debug)
             self.timesteps.append(spectral_data)
 
             # Prepare the PeakParams for the next time step.
