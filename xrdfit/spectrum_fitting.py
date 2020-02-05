@@ -191,12 +191,13 @@ class FitSpectrum:
         plt.show()
 
     def fit_peaks(self, peak_params: Union[PeakParams, List[PeakParams]],
-                  cakes: Union[int, List[int]], merge_cakes: bool = False):
+                  cakes: Union[int, List[int]], merge_cakes: bool = False, debug: bool = False):
         """Attempt to fit peaks within the ranges specified by `peak_ranges`.
         :param peak_params: A list of PeakParams describing the peaks to be fitted.
         :param cakes: Which cakes to fit.
         :param merge_cakes: If True and multiple cakes are specified then sum the cakes before
         fitting. Else do the fit to multiple cakes simultaneously.
+        :param debug: Whether to show debug info for slow fits.
         """
         self.fitted_peaks = []
         if isinstance(cakes, int):
@@ -217,7 +218,7 @@ class FitSpectrum:
                 new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima_bounds,
                                            peak.previous_fit_parameters)
             self.fitted_peaks.append(new_fit)
-            if new_fit.result.nfev > 500:
+            if new_fit.result.nfev > 500 and debug:
                 print(new_fit.result.init_params)
                 print(new_fit.result.params)
                 new_fit.result.plot_fit(show_init=True, numpoints=500)
@@ -425,7 +426,8 @@ class FittingExperiment:
     def _calculate_timesteps(self, num_timesteps: int) -> List[int]:
         """Work out which timesteps to plot."""
         timesteps = np.linspace(0, len(self.timesteps) - 1, num_timesteps)
-        timesteps = list(set(np.round(timesteps)))
+        # Remove duplicate values
+        timesteps = list(dict.fromkeys(np.round(timesteps)).keys())
         timesteps = [int(i) for i in timesteps]
 
         return timesteps
