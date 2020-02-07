@@ -24,6 +24,9 @@ bibliography: paper.bib
 
 100 words on xrd and material structure
 
+The evolution of peak profiles in synchrotron X-ray diffraction (SXRD) data can tell us how the internal crystallographic structures of metals change during applied heating, high temperature straining and cooling cycles `[@daniel_christopher_stuart_2019_3381183; @Stark2015; @Canelo-Yubero2016; @HU2017230]`, which is invaluable information  used to improve industrial processing routes `[@salem2008]`. The experiment requires a beamline, such as Diamond Light Source `[@DiamondLightSourceLtd2020]`, to produce a high energy X-ray beam and illuminate a polycrystalline sample `[@daniel_christopher_stuart_2019_3381183]`. The results are recorded in the form of time-resolved diffraction pattern rings, which are converted into a spectra of intensity peaks versus two-theta angle for a given direction `[@Filik2017; @Ashiotis2015; @Hammersley1996]`. However, since many intensity profiles are collected during each experiment, with detectors recording at speeds of up to 250 Hz `[@DiamondLightSourceLtdDetectors2020]`, fitting each of the individual lattice plane peaks can take a long time using current available software `[@Basham2015; @Merkel2015]`. It is also difficult to distinguish the evolution of any overlapping peaks in multi-phase materials. Therefore, a faster and more robust python script has been produced to fit the evolution of multiple and overlapping peaks for SXRD datasets containing many thousands of patterns.
+
+
 ``xrdfit`` is an Python package for fitting the peaks found in shallow x-ray 
 diffraction spectra. It is designed to be an easy to use tool for quick analysis of
 spectra. Features are included for automating fitting over many spectra to enable
