@@ -315,7 +315,10 @@ class FittingExperiment:
             return self.timesteps[0].get_fit(peak_name).result.var_names
 
     def get_fit_parameter(self, peak_name: str, fit_parameter: str) -> Union[None, np.ndarray]:
-        """Get the raw values of a fitting parameter over time."""
+        """Get the raw values and error of a fitting parameter over time.
+        Returns a NumPy array with x data in the first column, y data in the second column and
+        the y-error in the third column.
+        """
         if peak_name not in [peak.name for peak in self.peak_params]:
             print("Peak '{}' not found in fitted peaks.")
             return None
@@ -331,19 +334,22 @@ class FittingExperiment:
             x_data = np.array(self.frames_to_load) * self.spectrum_time
         else:
             x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
-        data = np.vstack((x_data, parameters)).T
+        errors = [parameter.stderr for parameter in parameters]
+        values = [parameter.value for parameter in parameters]
+        data = np.vstack((x_data, values, errors)).T
         return data
 
-    def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False):
+    def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False,
+                           show_error=True):
         """Plot a named parameter of a fit as a function of time.
         :param peak_name: The name of the fit to plot.
         :param fit_parameter: The name of the fit parameter to plot.
         :param show_points: Whether to show data points on the plot.
+        :param show_error: Whether to show the y-error as a shaded area on the plot.
         """
         data = self.get_fit_parameter(peak_name, fit_parameter)
-        error = self.get_error(peak_name, fit_parameter)
         if data is not None:
-            plotting.plot_parameter(data, error, fit_parameter, peak_name, show_points)
+            plotting.plot_parameter(data, fit_parameter, peak_name, show_points, show_error)
 
     def plot_fits(self, num_timesteps: int = 5, peak_names: Union[List[str], str] = None,
                   timesteps: List[int] = None, file_name: str = None):
