@@ -341,8 +341,9 @@ class FittingExperiment:
         :param show_points: Whether to show data points on the plot.
         """
         data = self.get_fit_parameter(peak_name, fit_parameter)
+        error = self.get_error(peak_name, fit_parameter)
         if data is not None:
-            plotting.plot_parameter(data, fit_parameter, peak_name, show_points)
+            plotting.plot_parameter(data, error, fit_parameter, peak_name, show_points)
 
     def plot_fits(self, num_timesteps: int = 5, peak_names: Union[List[str], str] = None,
                   timesteps: List[int] = None, file_name: str = None):
@@ -383,6 +384,9 @@ class FittingExperiment:
         with bz2.open(file_name, 'wb') as output_file:
             dill.dump(self, output_file)
         print("Data successfully saved to dump file.")
+
+    def get_error(self, peak_name, fit_parameter):
+        return None
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:

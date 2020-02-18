@@ -120,10 +120,13 @@ def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.m
     plt.close()
 
 
-def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_points: bool):
+def plot_parameter(data: np.ndarray, error: Union[None, np.ndarray], fit_parameter: str,
+                   peak_name: str, show_points: bool):
     """Plot a parameter of a fit against time."""
     line_spec = get_line_spec(show_points)
     plt.plot(data[:, 0], data[:, 1], line_spec)
+    if error:
+        plt.fill_between(data[:, 0], data[:, 1] - error, data[:, 0] + error)
     plt.xlabel("Time (s)")
     plt.ylabel(fit_parameter.replace("_", " ").title())
     plt.title("Peak {}".format(peak_name))
