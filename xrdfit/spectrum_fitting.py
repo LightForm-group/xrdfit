@@ -3,7 +3,6 @@ import glob
 from typing import List, Tuple, Union
 
 import numpy as np
-from scipy.signal import find_peaks
 import lmfit
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
@@ -258,60 +257,6 @@ class FitSpectrum:
             if fit.name == name:
                 return fit
         raise KeyError(f"Fit: '{name}' not found")
-
-    def detect_peaks(self, cakes: Union[int, List[int]],
-                     x_range: Tuple[float, float] = None):
-        """
-        All parameters in this function should be in units of data points and so
-        agnostic to the scale of the dataset being analysed. It will however be affected
-        by the density of the data points.
-        """
-        sub_spectrum = self.get_spectrum_subset(cakes, x_range, merge_cakes=True)
-
-        noise_level = np.percentile(sub_spectrum[:, 1], 40)
-
-        # Detect peaks in signal
-        peaks, peak_properties = find_peaks(sub_spectrum[:, 1], height=[None, None],
-                                            prominence=[1 * noise_level, None], width=[1, None])
-
-        # Separate out singlet and multiplet peaks
-        doublet_x_threshold = 15
-        doublet_y_threshold = 3
-        non_singlet_peaks = []
-
-        for peak_num, peak_index in enumerate(peaks):
-            if peak_num + 1 < len(peaks):
-                next_peak_index = peaks[peak_num + 1]
-                if (next_peak_index - peak_index) < doublet_x_threshold:
-                    if np.min(sub_spectrum[peak_index:next_peak_index,
-                              1]) > doublet_y_threshold * noise_level:
-                        non_singlet_peaks.append(peak_num)
-                        non_singlet_peaks.append(peak_num + 1)
-
-        # Build up list of PeakParams
-        peak_params = []
-        # Convert from data indices to two theta values
-        conversion_factor = sub_spectrum[1, 0] - sub_spectrum[0, 0]
-        # The offset of the whole spectrum from 0.
-        spectrum_offset = sub_spectrum[0, 0]
-        # A constant factor determining how wide the peak_bounds of PeakParams are set
-        constant_factor = 1.5
-        for peak_num, peak_index in enumerate(peaks):
-            if peak_num not in non_singlet_peaks:
-                half_width = 2 * peak_properties["widths"][peak_num]
-                left_offset = np.floor(peak_index - half_width * constant_factor)
-                left = left_offset * conversion_factor + spectrum_offset
-                right_offset = np.ceil(peak_index + half_width * constant_factor)
-                right = right_offset * conversion_factor + spectrum_offset
-                peak_params.append(PeakParams(str(peak_num), (round(left, 2), round(right, 2))))
-
-        # Print the PeakParams to std out in a copy/pasteable format.
-        print("[", end="")
-        for param in peak_params:
-            if param != peak_params[-1]:
-                print(f"{param},")
-            else:
-                print(f"{param}]")
 
 
 class FittingExperiment:
