@@ -58,7 +58,7 @@ def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lm
                    max=maximum[1])
         params.add(f"maximum_{index + 1}_sigma", value=sigma, min=min_sigma, max=max_sigma)
         params.add(f"maximum_{index + 1}_fraction", value=0.2, min=0, max=1)
-        params.add(f"maximum_{index + 1}_amplitude", value=amplitude)
+        params.add(f"maximum_{index + 1}_amplitude", value=amplitude, min=0)
     # Background should be > 0 but a little flexibility here improves the convergence of the fit.
     params.add("background", value=min(y_data), min=-10, max=max(y_data))
     return params

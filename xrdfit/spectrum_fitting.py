@@ -218,6 +218,7 @@ class FitSpectrum:
                                            peak.previous_fit_parameters)
             self.fitted_peaks.append(new_fit)
             if new_fit.result.nfev > 500 and debug:
+                print(peak.name)
                 print(new_fit.result.init_params)
                 print(new_fit.result.params)
                 new_fit.result.plot_fit(show_init=True, numpoints=500)
@@ -301,7 +302,31 @@ class FittingExperiment:
                 peak_params.adjust_maxima_bounds(peak_fit.result.params)
                 peak_params.adjust_peak_bounds(peak_fit.result.params)
 
+        self._evaluate_fits()
+
         print("Analysis complete.")
+
+    def _evaluate_fits(self, evaluation_threshold: int = 500):
+        """After having run a fit analysis, run through the fit results and check for any
+        that took a large number of evaluations and warn about these."""
+        peak_names = [peak.name for peak in self.timesteps[0].fitted_peaks]
+        poor_fits = {}
+        for name in peak_names:
+            poor_fits[name] = []
+
+        for index, spectrum in enumerate(self.timesteps):
+            for peak in spectrum.fitted_peaks:
+                if peak.result.nfev > evaluation_threshold:
+                    poor_fits[peak.name].append(index)
+
+        print("\n")
+        if [True for list in poor_fits.values() if list]:
+            print(f"The following fits took over {evaluation_threshold} fitting iterations."
+                  f"The quality of these fits should be checked.")
+        for peak, timesteps in poor_fits.items():
+            if timesteps:
+                print(f"Fit for peak {peak} at timesteps: {timesteps}")
+        print("\n")
 
     def peak_names(self) -> List[str]:
         """List the peaks specified for fitting in the PeakParams."""
