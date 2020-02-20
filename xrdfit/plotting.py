@@ -46,7 +46,11 @@ def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool,
                   x_range: Union[None, Tuple[float, float]] = None):
     """Plot a raw spectrum."""
     plt.figure(figsize=(8, 6))
-    line_spec = get_line_spec(show_points)
+    if show_points:
+        line_spec = "-x"
+    else:
+        line_spec = "-"
+
     if x_range:
         x_mask = np.logical_and(x_range[0] < data[:, 0], data[:, 0] < x_range[1])
     else:
@@ -55,7 +59,8 @@ def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool,
         plt.plot(data[x_mask, 0], data[x_mask, 1:], line_spec, linewidth=2)
     else:
         for cake_num in cakes_to_plot:
-            plt.plot(data[x_mask, 0], data[x_mask, cake_num], line_spec, linewidth=2, label=cake_num)
+            plt.plot(data[x_mask, 0], data[x_mask, cake_num], line_spec, linewidth=2,
+                     label=cake_num)
         plt.legend()
 
     # Plot formatting
@@ -126,20 +131,17 @@ def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_po
     The data array contains x data in the first column, y data in the second column and the y
     error in the third column.
     """
-    line_spec = get_line_spec(show_points)
+    no_covar_mask = data[:, 2] == 0
+    covar_mask = [not value for value in no_covar_mask]
     if show_error:
         plt.fill_between(data[:, 0], data[:, 1] - data[:, 2], data[:, 1] + data[:, 2], alpha=0.3)
         plt.plot(data[:, 0], data[:, 1] - data[:, 2], "--", lw=0.5, color='gray')
         plt.plot(data[:, 0], data[:, 1] + data[:, 2], "--", lw=0.5, color='gray')
-    plt.plot(data[:, 0], data[:, 1], line_spec)
+    plt.plot(data[:, 0], data[:, 1], "-", mec="red")
+    if show_points:
+        plt.plot(data[covar_mask, 0], data[covar_mask, 1], "x", mec="blue")
+        plt.plot(data[no_covar_mask, 0], data[no_covar_mask, 1], "^", mec="red")
     plt.xlabel("Time (s)")
     plt.ylabel(fit_parameter.replace("_", " ").title())
     plt.title("Peak {}".format(peak_name))
     plt.show()
-
-
-def get_line_spec(show_points: bool) -> str:
-    """Determine how the data points are shown with and without the raw data."""
-    if show_points:
-        return "-x"
-    return "-"

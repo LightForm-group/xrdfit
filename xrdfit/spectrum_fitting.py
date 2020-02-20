@@ -319,8 +319,8 @@ class FittingExperiment:
                 if peak.result.nfev > evaluation_threshold:
                     poor_fits[peak.name].append(index)
 
-        print("\n")
-        if [True for list in poor_fits.values() if list]:
+        if [True for populated_list in poor_fits.values() if populated_list]:
+            print("\n")
             print(f"The following fits took over {evaluation_threshold} fitting iterations."
                   f"The quality of these fits should be checked.")
         for peak, timesteps in poor_fits.items():
