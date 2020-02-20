@@ -334,7 +334,9 @@ class FittingExperiment:
             x_data = np.array(self.frames_to_load) * self.spectrum_time
         else:
             x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
-        errors = [parameter.stderr for parameter in parameters]
+        # It is possible that leastsq cant invert the curvature matrix so cant provide error
+        # estimates. In these cases stderr is given as None.
+        errors = [parameter.stderr if parameter.stderr else 0 for parameter in parameters]
         values = [parameter.value for parameter in parameters]
         data = np.vstack((x_data, values, errors)).T
         return data
@@ -390,9 +392,6 @@ class FittingExperiment:
         with bz2.open(file_name, 'wb') as output_file:
             dill.dump(self, output_file)
         print("Data successfully saved to dump file.")
-
-    def get_error(self, peak_name, fit_parameter):
-        return None
 
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
