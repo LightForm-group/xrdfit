@@ -350,7 +350,7 @@ class FittingExperiment:
         the y-error in the third column.
         """
         if peak_name not in [peak.name for peak in self.peak_params]:
-            print("Peak '{}' not found in fitted peaks.")
+            print(f"Peak '{peak_name}' not found in fitted peaks.")
             return None
         if fit_parameter not in self.fit_parameters(peak_name):
             print(f"Unknown fit parameter {fit_parameter} for peak {peak_name}")
