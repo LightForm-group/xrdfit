@@ -19,9 +19,10 @@ class PeakParams:
     :ivar peak_bounds: Where in the spectrum the peak begins and ends. The fit will be done over
     this region.
     :ivar maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
+    :ivar reuse_fits: Allows overriding of the global setting to reuse fits in a FittingExperiment
     """
     def __init__(self, name: str, peak_bounds: Tuple[float, float],
-                 maxima_bounds: List[Tuple[float, float]] = None):
+                 maxima_bounds: List[Tuple[float, float]] = None, reuse_fits=None):
         self.name = name
         self.peak_bounds = peak_bounds
         if maxima_bounds:
@@ -29,6 +30,7 @@ class PeakParams:
             self._check_maxima_bounds()
         else:
             self.maxima_bounds = [peak_bounds]
+        self.reuse_fits = reuse_fits
 
         self.previous_fit_parameters: Union[lmfit.Parameters, None] = None
 
@@ -218,6 +220,7 @@ class FitSpectrum:
                                            peak.previous_fit_parameters)
             self.fitted_peaks.append(new_fit)
             if new_fit.result.nfev > 500 and debug:
+                print(peak.name)
                 print(new_fit.result.init_params)
                 print(new_fit.result.params)
                 new_fit.result.plot_fit(show_init=True, numpoints=500)
@@ -279,7 +282,7 @@ class FittingExperiment:
 
         self.timesteps: List[FitSpectrum] = []
 
-    def run_analysis(self, reuse_fits=False, debug: bool = False):
+    def run_analysis(self, reuse_fits=False, debug: bool = False, evaluation_threshold: int = 500):
         """Iterate a fit over multiple diffraction patterns."""
         if self.frames_to_load:
             file_list = [self.file_string.format(number) for number in self.frames_to_load]
@@ -296,12 +299,39 @@ class FittingExperiment:
 
             # Prepare the PeakParams for the next time step.
             for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
-                if reuse_fits:
+                # Check for reuse fits inside PeakParams - this overrides the global value
+                if peak_params.reuse_fits:
+                    peak_params.set_previous_fit(peak_fit.result.params)
+                elif reuse_fits and peak_params.reuse_fits is not False:
                     peak_params.set_previous_fit(peak_fit.result.params)
                 peak_params.adjust_maxima_bounds(peak_fit.result.params)
                 peak_params.adjust_peak_bounds(peak_fit.result.params)
 
+        self._evaluate_fits(evaluation_threshold)
+
         print("Analysis complete.")
+
+    def _evaluate_fits(self, evaluation_threshold):
+        """After having run a fit analysis, run through the fit results and check for any
+        that took a large number of evaluations and warn about these."""
+        peak_names = [peak.name for peak in self.timesteps[0].fitted_peaks]
+        poor_fits = {}
+        for name in peak_names:
+            poor_fits[name] = []
+
+        for index, spectrum in enumerate(self.timesteps):
+            for peak in spectrum.fitted_peaks:
+                if peak.result.nfev > evaluation_threshold:
+                    poor_fits[peak.name].append(index)
+
+        if [True for populated_list in poor_fits.values() if populated_list]:
+            print("\n")
+            print(f"The following fits took over {evaluation_threshold} fitting iterations. "
+                  f"The quality of these fits should be checked.")
+        for peak, timesteps in poor_fits.items():
+            if timesteps:
+                print(f"Fit for peak {peak} at timesteps: {timesteps}")
+        print("\n")
 
     def peak_names(self) -> List[str]:
         """List the peaks specified for fitting in the PeakParams."""
@@ -315,7 +345,10 @@ class FittingExperiment:
             return self.timesteps[0].get_fit(peak_name).result.var_names
 
     def get_fit_parameter(self, peak_name: str, fit_parameter: str) -> Union[None, np.ndarray]:
-        """Get the raw values of a fitting parameter over time."""
+        """Get the raw values and error of a fitting parameter over time.
+        Returns a NumPy array with x data in the first column, y data in the second column and
+        the y-error in the third column.
+        """
         if peak_name not in [peak.name for peak in self.peak_params]:
             print("Peak '{}' not found in fitted peaks.")
             return None
@@ -331,18 +364,27 @@ class FittingExperiment:
             x_data = np.array(self.frames_to_load) * self.spectrum_time
         else:
             x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
-        data = np.vstack((x_data, parameters)).T
+        # It is possible that leastsq cant invert the curvature matrix so cant provide error
+        # estimates. In these cases stderr is given as None.
+        errors = [parameter.stderr if parameter.stderr else 0 for parameter in parameters]
+        values = [parameter.value for parameter in parameters]
+        data = np.vstack((x_data, values, errors)).T
         return data
 
-    def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False):
+    def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False,
+                           show_error=True, y_range: Tuple[float, float] = None):
         """Plot a named parameter of a fit as a function of time.
         :param peak_name: The name of the fit to plot.
         :param fit_parameter: The name of the fit parameter to plot.
         :param show_points: Whether to show data points on the plot.
+        :param show_error: Whether to show the y-error as a shaded area on the plot.
+        :param y_range: If specified the minimum and maximum values shown on the y-axis. This
+        can be useful if large error bars cause inappropriate y-scaling.
         """
         data = self.get_fit_parameter(peak_name, fit_parameter)
         if data is not None:
-            plotting.plot_parameter(data, fit_parameter, peak_name, show_points)
+            plotting.plot_parameter(data, fit_parameter, peak_name, show_points, show_error,
+                                    y_range)
 
     def plot_fits(self, num_timesteps: int = 5, peak_names: Union[List[str], str] = None,
                   timesteps: List[int] = None, file_name: str = None):
