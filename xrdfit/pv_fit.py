@@ -13,34 +13,35 @@ def do_pv_fit(peak_data: np.ndarray, maxima_locations: List[Tuple[float, float]]
     100x two-theta points.
     """
     model = None
-    peak_prefix = "maximum_{}_"
 
     num_maxima = len(maxima_locations)
 
     for maxima_num in range(num_maxima):
         # Add the peak to the model
+        prefix = f"maximum_{maxima_num + 1}_"
         if model:
-            model += lmfit.models.PseudoVoigtModel(prefix=peak_prefix.format(maxima_num + 1))
+            model += lmfit.models.PseudoVoigtModel(prefix=prefix)
         else:
-            model = lmfit.models.PseudoVoigtModel(prefix=peak_prefix.format(maxima_num + 1))
+            model = lmfit.models.PseudoVoigtModel(prefix=prefix)
+
     model += lmfit.Model(lambda background: background)
 
     two_theta = peak_data[:, 0]
     intensity = peak_data[:, 1]
 
     if not fit_parameters:
-        fit_parameters = guess_params(two_theta, intensity, maxima_locations)
+        fit_parameters = model.make_params()
+        fit_parameters = guess_params(fit_parameters, two_theta, intensity, maxima_locations)
 
-    fit_result = model.fit(intensity, fit_parameters, x=two_theta,
-                           fit_kws={"xtol": 1e-7}, iter_cb=iteration_callback)
+    fit_result = model.fit(intensity, fit_parameters, x=two_theta, iter_cb=iteration_callback)
 
     return fit_result
 
 
-def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lmfit.Parameters:
+def guess_params(params: lmfit.Parameters, x_data, y_data,
+                 maxima_ranges: List[Tuple[float, float]]) -> lmfit.Parameters:
     """Given a dataset and some details about where the maxima are, guess some good initial
     values for the PV fit."""
-    params = lmfit.Parameters()
 
     for index, maximum in enumerate(maxima_ranges):
         maximum_mask = np.logical_and(x_data > maximum[0],
@@ -53,12 +54,11 @@ def guess_params(x_data, y_data, maxima_ranges: List[Tuple[float, float]]) -> lm
         # Take the maximum height of the peak but the minimum height of the dataset overall
         # This is because the maximum_mask does not necessarily include baseline points.
         amplitude = (max(maxima_y) - min(y_data)) * 2 * sigma
-
-        params.add(f"maximum_{index + 1}_center", value=center, min=maximum[0],
-                   max=maximum[1])
-        params.add(f"maximum_{index + 1}_sigma", value=sigma, min=min_sigma, max=max_sigma)
-        params.add(f"maximum_{index + 1}_fraction", value=0.2, min=0, max=1)
-        params.add(f"maximum_{index + 1}_amplitude", value=amplitude, min=0)
+        param_prefix = f"maximum_{index + 1}"
+        params.add(f"{param_prefix}_center", value=center, min=maximum[0], max=maximum[1])
+        params.add(f"{param_prefix}_sigma", value=sigma, min=min_sigma, max=max_sigma)
+        params.add(f"{param_prefix}_fraction", value=0.2, min=0, max=1)
+        params.add(f"{param_prefix}_amplitude", value=amplitude, min=0)
     # Background should be > 0 but a little flexibility here improves the convergence of the fit.
     params.add("background", value=min(y_data), min=-10, max=max(y_data))
     return params
