@@ -133,16 +133,24 @@ def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_po
     """
     no_covar_mask = data[:, 2] == 0
     covar_mask = [not value for value in no_covar_mask]
+    # Plotting the data
+    plt.plot(data[:, 0], data[:, 1], "-", mec="red")
+    # Save the y-range to reapply later because the error bars can make it go crazy
+    current_y_range = plt.ylim()
+    if show_points:
+        plt.plot(data[covar_mask, 0], data[covar_mask, 1], "x", mec="blue")
+        plt.plot(data[no_covar_mask, 0], data[no_covar_mask, 1], "^", mec="blue")
+    # Plotting the error bars
     if show_error:
         plt.fill_between(data[:, 0], data[:, 1] - data[:, 2], data[:, 1] + data[:, 2], alpha=0.3)
         plt.plot(data[:, 0], data[:, 1] - data[:, 2], "--", lw=0.5, color='gray')
         plt.plot(data[:, 0], data[:, 1] + data[:, 2], "--", lw=0.5, color='gray')
-    plt.plot(data[:, 0], data[:, 1], "-", mec="red")
-    if show_points:
-        plt.plot(data[covar_mask, 0], data[covar_mask, 1], "x", mec="blue")
-        plt.plot(data[no_covar_mask, 0], data[no_covar_mask, 1], "^", mec="blue")
+
     if y_range:
         plt.ylim(y_range)
+    else:
+        plt.ylim(current_y_range)
+
     plt.xlabel("Time (s)")
     plt.ylabel(fit_parameter.replace("_", " ").title())
     plt.title("Peak {}".format(peak_name))
