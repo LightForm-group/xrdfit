@@ -342,7 +342,7 @@ class FittingExperiment:
         :param peak_name: The peak to list the parameters of.
         """
         if self.timesteps:
-            return self.timesteps[0].get_fit(peak_name).result.var_names
+            return list(self.timesteps[0].get_fit(peak_name).result.values.keys())
 
     def get_fit_parameter(self, peak_name: str, fit_parameter: str) -> Union[None, np.ndarray]:
         """Get the raw values and error of a fitting parameter over time.
