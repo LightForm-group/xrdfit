@@ -19,10 +19,9 @@ class PeakParams:
     :ivar peak_bounds: Where in the spectrum the peak begins and ends. The fit will be done over
     this region.
     :ivar maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
-    :ivar reuse_fits: Allows overriding of the global setting to reuse fits in a FittingExperiment
     """
     def __init__(self, name: str, peak_bounds: Tuple[float, float],
-                 maxima_bounds: List[Tuple[float, float]] = None, reuse_fits=None):
+                 maxima_bounds: List[Tuple[float, float]] = None):
         self.name = name
         self.peak_bounds = peak_bounds
         if maxima_bounds:
@@ -30,7 +29,6 @@ class PeakParams:
             self._check_maxima_bounds()
         else:
             self.maxima_bounds = [peak_bounds]
-        self.reuse_fits = reuse_fits
 
         self.previous_fit_parameters: Union[lmfit.Parameters, None] = None
 
@@ -299,11 +297,11 @@ class FittingExperiment:
 
             # Prepare the PeakParams for the next time step.
             for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
-                # Check for reuse fits inside PeakParams - this overrides the global value
-                if peak_params.reuse_fits:
-                    peak_params.set_previous_fit(peak_fit.result.params)
-                elif reuse_fits and peak_params.reuse_fits is not False:
-                    peak_params.set_previous_fit(peak_fit.result.params)
+                if reuse_fits:
+                    # Check signal to noise is good enough to reuse the params
+                    if check_snr(peak_fit.result.params):
+                        peak_params.set_previous_fit(peak_fit.result.params)
+                # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
                 peak_params.adjust_maxima_bounds(peak_fit.result.params)
                 peak_params.adjust_peak_bounds(peak_fit.result.params)
 
@@ -446,3 +444,14 @@ def load_dump(file_name: str) -> FittingExperiment:
         data = dill.load(input_file)
         print("Data successfully loaded from dump file.")
         return data
+
+
+def check_snr(params: lmfit.Parameters) -> bool:
+    """Iterate through the params and check whether any of the maxima in params have a low
+    signal to noise ratio."""
+    good_snr = True
+    for param_name in params:
+        if "snr" in param_name:
+            if params[param_name].value < 2:
+                good_snr = False
+    return good_snr
