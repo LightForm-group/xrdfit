@@ -1,3 +1,8 @@
+""" This module contain functions for plotting spectral data and the fits to it.
+None of these functions should be called directly by users - these functions are called from
+plot methods in spectrum_fitting.
+"""
+
 import os
 import pathlib
 from typing import Tuple, List, Union, TYPE_CHECKING
@@ -45,7 +50,6 @@ def plot_polar_heatmap(num_cakes: int, rad: List[int], z_data: np.ndarray, first
 def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool, show_points: bool,
                   x_range: Union[None, Tuple[float, float]] = None):
     """Plot a raw spectrum."""
-    plt.figure(figsize=(8, 6))
     if show_points:
         line_spec = "-x"
     else:
@@ -96,7 +100,6 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
 def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
                   fit_name: str, timestep: str = None, file_name: str = None):
     """Plot the result of a peak fit as well as the raw data."""
-    plt.figure(figsize=(8, 6))
 
     # First plot the raw data
     for index, cake_num in enumerate(cake_numbers):
