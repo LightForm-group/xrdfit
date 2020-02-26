@@ -280,7 +280,7 @@ class FitReport:
         self.num_evaluations: dict = {peak_name: [] for peak_name in peak_names}
         self.num_timesteps = None
 
-    def print(self, evaluation_threshold: int = 500):
+    def print(self, evaluation_threshold: int = 500, detailed=False):
         slow_fits = {}
         # Work out if any of the fits are slower than the evaluation threshold
         for name, evals in self.num_evaluations.items():
@@ -293,6 +293,11 @@ class FitReport:
                 if num_evaluations > 0:
                     percentage = num_evaluations / self.num_timesteps * 100
                     print(f"{percentage:2.1f}% of fits for peak {peak_name}")
+
+            if detailed:
+                print(f"Fit times:")
+                for peak_name, time in self.fit_time.items():
+                    print(f"{time:2.1f}: {peak_name}")
 
 
 class FittingExperiment:
