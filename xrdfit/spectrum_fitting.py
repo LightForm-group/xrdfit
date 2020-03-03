@@ -1,5 +1,6 @@
 import bz2
 import glob
+import time
 from typing import List, Tuple, Union
 
 import numpy as np
@@ -19,10 +20,9 @@ class PeakParams:
     :ivar peak_bounds: Where in the spectrum the peak begins and ends. The fit will be done over
     this region.
     :ivar maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
-    :ivar reuse_fits: Allows overriding of the global setting to reuse fits in a FittingExperiment
     """
     def __init__(self, name: str, peak_bounds: Tuple[float, float],
-                 maxima_bounds: List[Tuple[float, float]] = None, reuse_fits=None):
+                 maxima_bounds: List[Tuple[float, float]] = None):
         self.name = name
         self.peak_bounds = peak_bounds
         if maxima_bounds:
@@ -30,7 +30,6 @@ class PeakParams:
             self._check_maxima_bounds()
         else:
             self.maxima_bounds = [peak_bounds]
-        self.reuse_fits = reuse_fits
 
         self.previous_fit_parameters: Union[lmfit.Parameters, None] = None
 
@@ -122,6 +121,8 @@ class FitSpectrum:
         self.verbose = verbose
         self.first_cake_angle = first_cake_angle
         self.fitted_peaks: List[PeakFit] = []
+        self.num_evaluations = {}
+        self.fit_time = {}
 
         self.spectral_data = pd.read_table(file_path).to_numpy()
         if self.verbose:
@@ -206,9 +207,13 @@ class FitSpectrum:
         if isinstance(peak_params, PeakParams):
             peak_params = [peak_params]
 
+        self.fit_time = {peak.name: 0 for peak in peak_params}
+        self.num_evaluations = {peak.name: 0 for peak in peak_params}
+
         for peak in peak_params:
             new_fit = PeakFit(peak.name)
             new_fit.raw_spectrum = self.get_spectrum_subset(cakes, peak.peak_bounds, merge_cakes)
+            start = time.perf_counter()
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
                 new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.maxima_bounds,
@@ -218,13 +223,20 @@ class FitSpectrum:
                 stacked_spectrum = get_stacked_spectrum(new_fit.raw_spectrum)
                 new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima_bounds,
                                            peak.previous_fit_parameters)
+            fit_time = time.perf_counter() - start
             self.fitted_peaks.append(new_fit)
+            # Debug for slow fits
             if new_fit.result.nfev > 500 and debug:
                 print(peak.name)
                 print(new_fit.result.init_params)
                 print(new_fit.result.params)
                 new_fit.result.plot_fit(show_init=True, numpoints=500)
                 plt.show()
+
+            # Accounting
+            self.num_evaluations[peak.name] = new_fit.result.nfev
+            self.fit_time[peak.name] = fit_time
+            
         if self.verbose:
             print("Fitting complete.")
 
@@ -262,6 +274,32 @@ class FitSpectrum:
         raise KeyError(f"Fit: '{name}' not found")
 
 
+class FitReport:
+    def __init__(self, peak_names: List[str]):
+        self.fit_time: dict = {peak_name: 0 for peak_name in peak_names}
+        self.num_evaluations: dict = {peak_name: [] for peak_name in peak_names}
+        self.num_timesteps = None
+
+    def print(self, evaluation_threshold: int = 500, detailed=False):
+        slow_fits = {}
+        # Work out if any of the fits are slower than the evaluation threshold
+        for name, evals in self.num_evaluations.items():
+            evals = np.array(evals)
+            slow_fits[name] = np.sum(evals > evaluation_threshold)
+        if sum(slow_fits.values()):
+            print(f"The following fits took over {evaluation_threshold} fitting iterations. "
+                  f"The quality of these fits should be checked.")
+            for peak_name, num_evaluations in slow_fits.items():
+                if num_evaluations > 0:
+                    percentage = num_evaluations / self.num_timesteps * 100
+                    print(f"{percentage:2.1f}% of fits for peak {peak_name}")
+
+            if detailed:
+                print(f"Fit times:")
+                for peak_name, time in self.fit_time.items():
+                    print(f"{time:2.1f}: {peak_name} s")
+
+
 class FittingExperiment:
     """Information about a series of fits to temporally spaced diffraction patterns.
     :ivar spectrum_time: Time between subsequent diffraction patterns.
@@ -281,8 +319,9 @@ class FittingExperiment:
         self.frames_to_load = frames_to_load
 
         self.timesteps: List[FitSpectrum] = []
+        self.fit_report = FitReport([peak.name for peak in peak_params])
 
-    def run_analysis(self, reuse_fits=False, debug: bool = False, evaluation_threshold: int = 500):
+    def run_analysis(self, reuse_fits=False, debug: bool = False):
         """Iterate a fit over multiple diffraction patterns."""
         if self.frames_to_load:
             file_list = [self.file_string.format(number) for number in self.frames_to_load]
@@ -291,7 +330,9 @@ class FittingExperiment:
             if len(file_list) == 0:
                 raise FileNotFoundError(f"No files found with file stub: '{self.file_string}'")
 
-        print("Processing {} diffraction patterns.".format(len(file_list)))
+        self.fit_report.num_timesteps = len(file_list)
+
+        print(f"Processing {len(file_list)} diffraction patterns.")
         for file_path in tqdm(file_list):
             spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
             spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes, debug)
@@ -299,39 +340,17 @@ class FittingExperiment:
 
             # Prepare the PeakParams for the next time step.
             for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
-                # Check for reuse fits inside PeakParams - this overrides the global value
-                if peak_params.reuse_fits:
-                    peak_params.set_previous_fit(peak_fit.result.params)
-                elif reuse_fits and peak_params.reuse_fits is not False:
-                    peak_params.set_previous_fit(peak_fit.result.params)
+                if reuse_fits:
+                    # Check signal to noise is good enough to reuse the params
+                    if check_snr(peak_fit.result.params):
+                        peak_params.set_previous_fit(peak_fit.result.params)
+                # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
                 peak_params.adjust_maxima_bounds(peak_fit.result.params)
                 peak_params.adjust_peak_bounds(peak_fit.result.params)
-
-        self._evaluate_fits(evaluation_threshold)
+            self._update_fit_report(spectral_data)
 
         print("Analysis complete.")
-
-    def _evaluate_fits(self, evaluation_threshold):
-        """After having run a fit analysis, run through the fit results and check for any
-        that took a large number of evaluations and warn about these."""
-        peak_names = [peak.name for peak in self.timesteps[0].fitted_peaks]
-        poor_fits = {}
-        for name in peak_names:
-            poor_fits[name] = []
-
-        for index, spectrum in enumerate(self.timesteps):
-            for peak in spectrum.fitted_peaks:
-                if peak.result.nfev > evaluation_threshold:
-                    poor_fits[peak.name].append(index)
-
-        if [True for populated_list in poor_fits.values() if populated_list]:
-            print("\n")
-            print(f"The following fits took over {evaluation_threshold} fitting iterations. "
-                  f"The quality of these fits should be checked.")
-        for peak, timesteps in poor_fits.items():
-            if timesteps:
-                print(f"Fit for peak {peak} at timesteps: {timesteps}")
-        print("\n")
+        self.fit_report.print()
 
     def peak_names(self) -> List[str]:
         """List the peaks specified for fitting in the PeakParams."""
@@ -342,7 +361,7 @@ class FittingExperiment:
         :param peak_name: The peak to list the parameters of.
         """
         if self.timesteps:
-            return self.timesteps[0].get_fit(peak_name).result.var_names
+            return list(self.timesteps[0].get_fit(peak_name).result.values.keys())
 
     def get_fit_parameter(self, peak_name: str, fit_parameter: str) -> Union[None, np.ndarray]:
         """Get the raw values and error of a fitting parameter over time.
@@ -426,6 +445,15 @@ class FittingExperiment:
             dill.dump(self, output_file)
         print("Data successfully saved to dump file.")
 
+    def _update_fit_report(self, spectral_data: FitSpectrum):
+        """Update the fit report with stats from the fitting.
+        :param spectral_data: The Spectrum which was just fitted.
+        """
+        for peak_name, fit_time in spectral_data.fit_time.items():
+            self.fit_report.fit_time[peak_name] += fit_time
+        for peak_name, num_evaluations in spectral_data.num_evaluations.items():
+            self.fit_report.num_evaluations[peak_name].append(num_evaluations)
+
 
 def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
     """Take an number of observations from N different cakes and stack them vertically into a 2
@@ -446,3 +474,14 @@ def load_dump(file_name: str) -> FittingExperiment:
         data = dill.load(input_file)
         print("Data successfully loaded from dump file.")
         return data
+
+
+def check_snr(params: lmfit.Parameters) -> bool:
+    """Iterate through the params and check whether any of the maxima in params have a low
+    signal to noise ratio."""
+    good_snr = True
+    for param_name in params:
+        if "snr" in param_name:
+            if params[param_name].value < 2:
+                good_snr = False
+    return good_snr

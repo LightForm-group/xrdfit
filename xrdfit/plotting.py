@@ -1,3 +1,8 @@
+""" This module contain functions for plotting spectral data and the fits to it.
+None of these functions should be called directly by users - these functions are called from
+plot methods in spectrum_fitting.
+"""
+
 import os
 import pathlib
 from typing import Tuple, List, Union, TYPE_CHECKING
@@ -45,7 +50,6 @@ def plot_polar_heatmap(num_cakes: int, rad: List[int], z_data: np.ndarray, first
 def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool, show_points: bool,
                   x_range: Union[None, Tuple[float, float]] = None):
     """Plot a raw spectrum."""
-    plt.figure(figsize=(8, 6))
     if show_points:
         line_spec = "-x"
     else:
@@ -96,7 +100,6 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
 def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
                   fit_name: str, timestep: str = None, file_name: str = None):
     """Plot the result of a peak fit as well as the raw data."""
-    plt.figure(figsize=(8, 6))
 
     # First plot the raw data
     for index, cake_num in enumerate(cake_numbers):
@@ -133,16 +136,24 @@ def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_po
     """
     no_covar_mask = data[:, 2] == 0
     covar_mask = [not value for value in no_covar_mask]
+    # Plotting the data
+    plt.plot(data[:, 0], data[:, 1], "-", mec="red")
+    # Save the y-range to reapply later because the error bars can make it go crazy
+    current_y_range = plt.ylim()
+    if show_points:
+        plt.plot(data[covar_mask, 0], data[covar_mask, 1], "x", mec="blue")
+        plt.plot(data[no_covar_mask, 0], data[no_covar_mask, 1], "^", mec="blue")
+    # Plotting the error bars
     if show_error:
         plt.fill_between(data[:, 0], data[:, 1] - data[:, 2], data[:, 1] + data[:, 2], alpha=0.3)
         plt.plot(data[:, 0], data[:, 1] - data[:, 2], "--", lw=0.5, color='gray')
         plt.plot(data[:, 0], data[:, 1] + data[:, 2], "--", lw=0.5, color='gray')
-    plt.plot(data[:, 0], data[:, 1], "-", mec="red")
-    if show_points:
-        plt.plot(data[covar_mask, 0], data[covar_mask, 1], "x", mec="blue")
-        plt.plot(data[no_covar_mask, 0], data[no_covar_mask, 1], "^", mec="blue")
+
     if y_range:
         plt.ylim(y_range)
+    else:
+        plt.ylim(current_y_range)
+
     plt.xlabel("Time (s)")
     plt.ylabel(fit_parameter.replace("_", " ").title())
     plt.title("Peak {}".format(peak_name))
