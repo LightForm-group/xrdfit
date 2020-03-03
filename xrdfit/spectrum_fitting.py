@@ -297,7 +297,7 @@ class FitReport:
             if detailed:
                 print(f"Fit times:")
                 for peak_name, time in self.fit_time.items():
-                    print(f"{time:2.1f}: {peak_name}")
+                    print(f"{time:2.1f}: {peak_name} s")
 
 
 class FittingExperiment:
