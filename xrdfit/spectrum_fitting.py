@@ -100,13 +100,13 @@ class PeakFit:
         self.result: Union[None, lmfit.model.ModelResult] = None
         self.cake_numbers: List[int] = []
 
-    def plot(self, timestep: str = None, file_name: str = None):
+    def plot(self, timestep: str = None, file_name: str = None, title: str = None):
         """ Plot the raw spectral data and the fit."""
         if self.raw_spectrum is None:
             print("Cannot plot fit peak as fitting has not been done yet.")
         else:
             plotting.plot_peak_fit(self.raw_spectrum, self.cake_numbers, self.result, self.name,
-                                   timestep, file_name)
+                                   timestep, file_name, title)
 
 
 class FitSpectrum:
@@ -295,12 +295,12 @@ class FitReport:
                     print(f"{percentage:2.1f}% of fits for peak {peak_name}")
 
             if detailed:
-                print(f"Fit times:")
+                print(f"\nFit times:")
                 for peak_name, time in self.fit_time.items():
-                    print(f"{time:2.1f}: {peak_name} s")
+                    print(f"{time:2.1f} s: {peak_name}")
 
 
-class FittingExperiment:
+class FitExperiment:
     """Information about a series of fits to temporally spaced diffraction patterns.
     :ivar spectrum_time: Time between subsequent diffraction patterns.
     :ivar file_string: String used to glob for the diffraction patterns.
@@ -391,19 +391,19 @@ class FittingExperiment:
         return data
 
     def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False,
-                           show_error=True, y_range: Tuple[float, float] = None):
+                           show_error=True, scale_by_error: bool = False):
         """Plot a named parameter of a fit as a function of time.
         :param peak_name: The name of the fit to plot.
         :param fit_parameter: The name of the fit parameter to plot.
         :param show_points: Whether to show data points on the plot.
         :param show_error: Whether to show the y-error as a shaded area on the plot.
-        :param y_range: If specified the minimum and maximum values shown on the y-axis. This
-        can be useful if large error bars cause inappropriate y-scaling.
+        :param scale_by_error: If False the y-axis will be scaled to fit the data values. If True
+        the y-axis will be scaled to fit the error values.
         """
         data = self.get_fit_parameter(peak_name, fit_parameter)
         if data is not None:
             plotting.plot_parameter(data, fit_parameter, peak_name, show_points, show_error,
-                                    y_range)
+                                    scale_by_error)
 
     def plot_fits(self, num_timesteps: int = 5, peak_names: Union[List[str], str] = None,
                   timesteps: List[int] = None, file_name: str = None):
@@ -467,7 +467,7 @@ def get_stacked_spectrum(spectrum: np.ndarray) -> np.ndarray:
     return stacked_data
 
 
-def load_dump(file_name: str) -> FittingExperiment:
+def load_dump(file_name: str) -> FitExperiment:
     """Load a FittingExperiment object saved using the FittingExperiment.save() method."""
     print("Loading data from dump file.")
     with bz2.open(file_name, "rb") as input_file:

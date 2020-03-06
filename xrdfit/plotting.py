@@ -98,7 +98,7 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
 
 
 def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
-                  fit_name: str, timestep: str = None, file_name: str = None):
+                  fit_name: str, timestep: str = None, file_name: str = None, title: str = None):
     """Plot the result of a peak fit as well as the raw data."""
 
     # First plot the raw data
@@ -116,7 +116,10 @@ def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.m
     plt.legend()
     if timestep:
         fit_name = f'Peak "{fit_name}" at t = {timestep}'
-    plt.title(fit_name)
+    if title:
+        plt.title(title)
+    else:
+        plt.title(fit_name)
     plt.tight_layout()
     if file_name:
         file_name = pathlib.Path(file_name)
@@ -129,7 +132,7 @@ def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.m
 
 
 def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_points: bool,
-                   show_error: bool, y_range: Union[None, Tuple[float, float]]):
+                   show_error: bool, scale_by_error: bool = False):
     """Plot a parameter of a fit against time.
     The data array contains x data in the first column, y data in the second column and the y
     error in the third column.
@@ -138,8 +141,8 @@ def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_po
     covar_mask = [not value for value in no_covar_mask]
     # Plotting the data
     plt.plot(data[:, 0], data[:, 1], "-", mec="red")
-    # Save the y-range to reapply later because the error bars can make it go crazy
-    current_y_range = plt.ylim()
+    # Save the y-range to reapply later if wanted
+    data_y_range = plt.ylim()
     if show_points:
         plt.plot(data[covar_mask, 0], data[covar_mask, 1], "x", mec="blue")
         plt.plot(data[no_covar_mask, 0], data[no_covar_mask, 1], "^", mec="blue")
@@ -149,10 +152,8 @@ def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_po
         plt.plot(data[:, 0], data[:, 1] - data[:, 2], "--", lw=0.5, color='gray')
         plt.plot(data[:, 0], data[:, 1] + data[:, 2], "--", lw=0.5, color='gray')
 
-    if y_range:
-        plt.ylim(y_range)
-    else:
-        plt.ylim(current_y_range)
+    if not scale_by_error:
+        plt.ylim(data_y_range)
 
     plt.xlabel("Time (s)")
     plt.ylabel(fit_parameter.replace("_", " ").title())
