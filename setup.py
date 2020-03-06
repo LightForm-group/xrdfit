@@ -11,9 +11,8 @@ setup(
                       'pandas',
                       'dill',
                       'tqdm',
-                      'scipy',
                       'lmfit',
-					  'jupyter',
+                      'jupyter',
                       ],
     extras_require={"documentation_compilation": "sphinx"}
 )
