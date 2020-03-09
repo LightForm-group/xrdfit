@@ -1,5 +1,5 @@
 ---
-title: 'xrdfit: A Python module for fitting SXRD diffraction spectra'
+title: 'xrdfit: A Python package for fitting SXRD diffraction spectra'
 tags:
   - Python
   - physics
@@ -20,13 +20,14 @@ bibliography: paper.bib
 
 ---
 
+
 # Summary
 
-The evolution of peak profiles in synchrotron X-ray diffraction (SXRD) data can tell us how the internal crystallographic structures of metals change during applied heating, high temperature straining and cooling cycles [@Daniel_2019; @Stark_2015; @Canelo_Yubero_2016; @Hu_2017], which is invaluable information  used to improve industrial processing routes [@Salem_2008]. The experiment requires a beamline, such as Diamond Light Source [@Diamond_2020], to produce a high energy X-ray beam and illuminate a polycrystalline sample [@Daniel_2019]. The results are recorded in the form of time-resolved diffraction pattern rings, which are converted into a spectra of intensity peaks versus two-theta angle for a given direction [@Filik_2017; @Ashiotis_2015; @Hammersley_1996]. However, since many intensity profiles are collected during each experiment, with detectors recording at speeds of up to 250 Hz [@Diamond2_2020], fitting each of the individual lattice plane peaks can take a long time using current available software [@Basham_2015; @Merkel_2015]. It is also difficult to distinguish the evolution of any overlapping peaks in multi-phase materials. Therefore, a faster and more robust Python module has been developed to fit the evolution of multiple and overlapping peaks for SXRD datasets containing many thousands of patterns.
+The evolution of peak profiles in synchrotron X-ray diffraction (SXRD) data can tell us how the internal crystallographic structures of metals change during applied heating, high temperature straining and cooling cycles [@Daniel_2019; @Stark_2015; @Canelo_Yubero_2016; @Hu_2017], which is invaluable information  used to improve industrial processing routes [@Salem_2008]. The experiment requires a beamline, such as Diamond Light Source [@Diamond_2020], to produce a high energy X-ray beam and illuminate a polycrystalline sample [@Daniel_2019]. The results are recorded in the form of time-resolved diffraction pattern rings, which are converted into a spectra of intensity peaks versus two-theta angle for a given direction [@Filik_2017; @Ashiotis_2015; @Hammersley_1996]. However, since many intensity profiles are collected during each experiment, with detectors recording at speeds of up to 250 Hz [@Diamond2_2020], fitting each of the individual lattice plane peaks can take a long time using current available software [@Basham_2015; @Merkel_2015]. It is also difficult to distinguish the evolution of any overlapping peaks in multi-phase materials. Therefore, a faster and more robust Python package has been developed to fit the evolution of multiple and overlapping peaks for SXRD datasets containing many thousands of patterns.
 
-``xrdfit`` is an Python module for fitting the peaks found in shallow x-ray diffraction spectra. It is designed to be an easy to use tool for quick analysis of spectra. Features are included for automating fitting over many spectra to enable tracking of peaks as they shift through the experiment. ``xrdfit`` uses the Python module ``lmfit`` [@Newville_2014] for the underlying fitting.
+``xrdfit`` is a Python package for fitting the peaks found in shallow x-ray diffraction spectra. It is intended as an easy to use tool for quick analysis of spectra. Features are included for automating fitting over many spectra to enable tracking of peaks as they shift through the experiment. ``xrdfit`` uses the Python package ``lmfit`` [@Newville_2014] for the underlying fitting.
 
-``xrdfit`` is designed to be used by experimental researchers who need to process SXRD spectra but do not have a detailed knowledge of programming or fitting. It has been used for the analysis of data presented in [insert paper here]. We hope that its public release will allow other researchers to benefit from fast data fitting, reducing the effort required to do basic analysis of their experimental data.
+``xrdfit`` is designed to be accessible for all researchers who need to process SXRD spectra and so does not require a detailed knowledge of programming or fitting. It has been used for the analysis of data presented in an article currently in preparation [@Daniel_2019] and will be used for future studies in our group. We hope that its public release will allow other researchers to benefit from fast data fitting, reducing the effort required to do basic analysis of their experimental data.
 
 # Acknowledgements
 

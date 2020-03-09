@@ -12,12 +12,13 @@ import numpy as np
 def do_pv_fit(peak_data: np.ndarray, maxima_locations: List[Tuple[float, float]],
               fit_parameters: lmfit.Parameters = None) -> lmfit.model.ModelResult:
     """Pseudo-Voigt fit to the lattice plane peak intensity.
+
     :param peak_data: The data to be fitted, two theta values (x-data) in column 0 and intensity
-    (y-data) in column 1.
+      (y-data) in column 1.
     :param maxima_locations: A list of Tuples indicating approximately where the maxima are in the
-    peak_data. These are used to make guesses for the initial parameters of the fit.
+      peak_data. These are used to make guesses for the initial parameters of the fit.
     :param fit_parameters: If provided, use these parameters for the fit instead of guessing
-    parameters
+      parameters
     """
     model = None
 
@@ -49,12 +50,13 @@ def guess_params(params: lmfit.Parameters, x_data: np.ndarray, y_data: np.ndarra
                  maxima_ranges: List[Tuple[float, float]]) -> lmfit.Parameters:
     """Given a dataset and some information about where the maxima are, guess some good initial
     values for the Pseudo-Voigt fit.
+
     :param params: The lmfit.Parameters instance to store the guessed parameters.
     :param x_data: The x data to be fitted.
     :param y_data: The y data to be fitted.
     :param maxima_ranges: A pair of floats for each maximum indicating a range of x-values that
-    the maximum falls in."""
-
+      the maximum falls in.
+    """
     for index, maximum in enumerate(maxima_ranges):
         maximum_mask = np.logical_and(x_data > maximum[0],
                                       x_data < maximum[1])
@@ -80,10 +82,12 @@ def guess_params(params: lmfit.Parameters, x_data: np.ndarray, y_data: np.ndarra
 def guess_sigma(x_data: np.ndarray,
                 maximum_range: Tuple[float, float]) -> Tuple[float, float, float]:
     """Guess an initial value of sigma for the Pseudo-Voigt fit.
+
     :param x_data: The x_data to be fitted.
     :param maximum_range: Two floats indicating the range of values that the maximum falls within.
     :return: A maximum possible value for sigma, a minimum possible value and the initial guess
-    of sigma."""
+      of sigma.
+    """
 
     # By definition in the PV fit, sigma is half the width of the peak at FHWM.
     # In the case of a single peak, the maximum range is set to the peak bounds

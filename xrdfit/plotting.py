@@ -25,6 +25,7 @@ matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 def plot_polar_heat_map(num_cakes: int, rad: List[int], z_data: np.ndarray, first_cake_angle: int):
     """Plot a polar heat map using matplotlib.
+
     :param num_cakes: The number of segments the polar map is divided into.
     :param rad: The radial bin edges.
     :param z_data: A num_cakes by rad shaped array of data to plot.
@@ -54,11 +55,12 @@ def plot_polar_heat_map(num_cakes: int, rad: List[int], z_data: np.ndarray, firs
 def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool, show_points: bool,
                   x_range: Union[None, Tuple[float, float]] = None):
     """Plot a raw spectrum using matplotlib.
+
     :param data: The data to plot, x_data in column 0, y data in columns 1-N where N is the number
-    of cakes in the dataset.
+      of cakes in the dataset.
     :param cakes_to_plot: Which cakes (columns of y data) to plot.
     :param merge_cakes: If True plot the sum of the selected cakes as a single line. If False plot
-    all selected cakes individually.
+      all selected cakes individually.
     :param show_points: Whether to show data points on the plot.
     :param x_range: If supplied, restricts the x-axis of the plot to this range.
     """
@@ -93,6 +95,7 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
     Maxima bounds are shown by a dashed green line for the min bound and a dashed red line for
     the max bound. This method is called with an active plot environment and plots the peak
     params on top.
+
     :param peak_params: The peak params to plot
     :param x_range: If supplied, restricts the x-axis of the plot to this range.
     """
@@ -117,6 +120,7 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
 def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
                   fit_name: str, time_step: str = None, file_name: str = None, title: str = None):
     """Plot the result of a peak fit as well as the raw data.
+
     :param data: The raw data to plot. X-data in the first column, y-data in subsequent columns.
     :param cake_numbers: The numbers of one or more cakes to plot.
     :param fit_result: An lmfit Model Result. Used to plot the model fit.
@@ -159,15 +163,16 @@ def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.m
 def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_points: bool,
                    show_error: bool, scale_by_error: bool = False):
     """Plot a parameter of a fit against time.
+
     :param data: The data to plot, x data in the first column, y data in the second column and
-    the y error in the third column.
+      the y error in the third column.
     :param fit_parameter: The name of the parameter being plotted, used to generate the y-axis label
     :param peak_name: The name of the peak to which the parameter corresponds. Used to generate the
-    plot title.
+      plot title.
     :param show_points: Whether to show data points on the plot.
     :param show_error: Whether to show error bars on the plot.
     :param scale_by_error: If True auto scale the y-axis to the range of the error bars. If False,
-    auto scale the y-axis to the range of the data.
+      auto scale the y-axis to the range of the data.
     """
     no_covar_mask = data[:, 2] == 0
     covar_mask = [not value for value in no_covar_mask]

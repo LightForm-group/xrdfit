@@ -1,7 +1,12 @@
-[![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007) 
+[![GitHub Release] (https://img.shields.io/github/v/release/LightForm-group/xrdfit)
 [![PyPI version](https://badge.fury.io/py/xrdfit.svg)](https://badge.fury.io/py/xrdfit)
 [![Documentation Status](https://readthedocs.org/projects/xrdfit/badge/?version=latest)](https://xrdfit.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007) 
 
+Introduction
+--------------
+
+xrdfit is a Python module for fitting the peaks found in shallow x-ray diffraction spectra. It is designed to be an easy to use tool for quick analysis of spectra. Features are included for automating fitting over many spectra to enable tracking of peaks as they shift through the experiment. xrdfit uses the Python module lmfit for the underlying fitting. xrdfit is designed to be accessible for all researchers who need to process SXRD spectra and so does not require a detailed knowledge of programming or fitting.
 
 Installation
 -------------
