@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007)
+
 Installation
 -------------
 
