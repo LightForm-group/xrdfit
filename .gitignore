@@ -14,3 +14,5 @@ __pycache__/
 /xrdfit/test.py
 /xrdfit.egg-info
 /example_data/example_data_large/
+/build
+/dist

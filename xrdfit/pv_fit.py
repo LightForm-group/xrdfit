@@ -1,3 +1,8 @@
+""" This module contain functions implementing the Pseudo-Voigt fit in lmfit.
+None of these functions should be called directly by users - these functions are called from
+methods in spectrum_fitting.
+"""
+
 from typing import List, Tuple
 
 import lmfit
@@ -5,19 +10,22 @@ import numpy as np
 
 
 def do_pv_fit(peak_data: np.ndarray, maxima_locations: List[Tuple[float, float]],
-              fit_parameters: lmfit.Parameters = None):
-    """
-    Pseudo-Voigt fit to the lattice plane peak intensity.
-    Return results of the fit as an lmfit class, which contains the fitted parameters
-    (amplitude, fwhm, etc.) and the fit line calculated using the fit parameters and
-    100x two-theta points.
+              fit_parameters: lmfit.Parameters = None) -> lmfit.model.ModelResult:
+    """Pseudo-Voigt fit to the lattice plane peak intensity.
+
+    :param peak_data: The data to be fitted, two theta values (x-data) in column 0 and intensity
+      (y-data) in column 1.
+    :param maxima_locations: A list of Tuples indicating approximately where the maxima are in the
+      peak_data. These are used to make guesses for the initial parameters of the fit.
+    :param fit_parameters: If provided, use these parameters for the fit instead of guessing
+      parameters
     """
     model = None
 
     num_maxima = len(maxima_locations)
 
+    # Add one peak to the model for each maximum
     for maxima_num in range(num_maxima):
-        # Add the peak to the model
         prefix = f"maximum_{maxima_num + 1}_"
         if model:
             model += lmfit.models.PseudoVoigtModel(prefix=prefix)
@@ -33,16 +41,22 @@ def do_pv_fit(peak_data: np.ndarray, maxima_locations: List[Tuple[float, float]]
         fit_parameters = model.make_params()
         fit_parameters = guess_params(fit_parameters, two_theta, intensity, maxima_locations)
 
-    fit_result = model.fit(intensity, fit_parameters, x=two_theta, iter_cb=iteration_callback)
+    fit_result = model.fit(intensity, fit_parameters, x=two_theta)
 
     return fit_result
 
 
-def guess_params(params: lmfit.Parameters, x_data, y_data,
+def guess_params(params: lmfit.Parameters, x_data: np.ndarray, y_data: np.ndarray,
                  maxima_ranges: List[Tuple[float, float]]) -> lmfit.Parameters:
-    """Given a dataset and some details about where the maxima are, guess some good initial
-    values for the PV fit."""
+    """Given a dataset and some information about where the maxima are, guess some good initial
+    values for the Pseudo-Voigt fit.
 
+    :param params: The lmfit.Parameters instance to store the guessed parameters.
+    :param x_data: The x data to be fitted.
+    :param y_data: The y data to be fitted.
+    :param maxima_ranges: A pair of floats for each maximum indicating a range of x-values that
+      the maximum falls in.
+    """
     for index, maximum in enumerate(maxima_ranges):
         maximum_mask = np.logical_and(x_data > maximum[0],
                                       x_data < maximum[1])
@@ -51,8 +65,9 @@ def guess_params(params: lmfit.Parameters, x_data, y_data,
         center = maxima_x[np.argmax(maxima_y)]
 
         max_sigma, min_sigma, sigma = guess_sigma(x_data, maximum)
-        # Take the maximum height of the peak but the minimum height of the dataset overall
-        # This is because the maximum_mask does not necessarily include baseline points.
+        # When calculating amplitude take the maximum height of the peak but the minimum height
+        # of the dataset overall. This is because the maximum_mask does not necessarily
+        # include baseline points and we need the noise level.
         amplitude = (max(maxima_y) - min(y_data)) * 2 * sigma
         param_prefix = f"maximum_{index + 1}"
         params.add(f"{param_prefix}_center", value=center, min=maximum[0], max=maximum[1])
@@ -64,19 +79,31 @@ def guess_params(params: lmfit.Parameters, x_data, y_data,
     return params
 
 
-def guess_sigma(x_data, maximum_range):
-    # Sigma is half the width of the peak at FHWM
+def guess_sigma(x_data: np.ndarray,
+                maximum_range: Tuple[float, float]) -> Tuple[float, float, float]:
+    """Guess an initial value of sigma for the Pseudo-Voigt fit.
+
+    :param x_data: The x_data to be fitted.
+    :param maximum_range: Two floats indicating the range of values that the maximum falls within.
+    :return: A maximum possible value for sigma, a minimum possible value and the initial guess
+      of sigma.
+    """
+
+    # By definition in the PV fit, sigma is half the width of the peak at FHWM.
+    # In the case of a single peak, the maximum range is set to the peak bounds
+    # In the case of multiplet peaks the maximum range is set approximately at the
+    # FWHM either side of the peak.
     x_range = max(x_data) - min(x_data)
     maximum_range = maximum_range[1] - maximum_range[0]
 
     if maximum_range > 0.8 * x_range:
         # If the maximum range is similar to the x_range then we have a single peak. Make
         # assumptions based on data width
-        # Sigma is very approximately 7% of the peak_bounds.
+        # Sigma is approximately 7% of the peak_bounds
         sigma = 0.07 * x_range
-        # The minimum sigma is very approximately 2.5% of the peak bounds
+        # The minimum sigma is approximately 2.5% of the peak bounds
         min_sigma = 0.025 * x_range
-        # The maximum sigma is very approximately 20% of the peak bounds
+        # The maximum sigma is approximately 20% of the peak bounds
         max_sigma = 0.20 * x_range
 
     else:
@@ -86,10 +113,3 @@ def guess_sigma(x_data, maximum_range):
         max_sigma = 4 * maximum_range
 
     return max_sigma, min_sigma, sigma
-
-
-# noinspection PyUnusedLocal
-def iteration_callback(parameters, iteration_num, residuals, *args, **kws):
-    """This method is called on every iteration of the minimisation. This can be used
-    to monitor progress."""
-    return False

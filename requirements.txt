@@ -3,5 +3,5 @@ matplotlib
 pandas
 dill
 tqdm
-scipy
 lmfit
+jupyter
