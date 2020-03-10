@@ -1,6 +1,6 @@
 # Contributing
 
-We welcome bug reports, feature requests and suggestions for improvement made to this package. Below are some guidleines to keep in mind when requesting or making changes.
+We welcome bug reports, feature requests and suggestions for improvement made to this package. Below are some guidelines to keep in mind when requesting or making changes.
 
 ## Reporting Issues
 
@@ -13,3 +13,14 @@ You should include details about what version of ``xrdfit`` you are using, what 
 This project uses the PEP8 standard for formatting Python code with the exception that the maximum line length is 120 characters.
 
 Docstrings are formatted in the reStructuredText format. These are automatically harvested by the Sphinx autodoc extension and form the API documentation at Read The Docs: (https://xrdfit.readthedocs.io/en/latest/)
+
+## Release guidelines
+
+Releases follow the [semver](https://semver.org/) numbering scheme.
+
+When releasing a new version the following need to be updated:
+* Update version number in setup.py
+* Update version number in docs/config.py
+* Add tag to git repo of the version number prefixed by the letter “v”
+* Draft release on GitHub for that tag with a list of changes since the last version
+* Upload new version to PyPi
