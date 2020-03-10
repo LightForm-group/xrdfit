@@ -19,28 +19,33 @@ from xrdfit.pv_fit import do_pv_fit
 class PeakParams:
     """An object containing information about a peak and its maxima.
 
-    :ivar name: A name for the peak.
     :ivar peak_bounds: Where in the spectrum the peak begins and ends. The fit will be done over
       this region.
+    :ivar maxima_names: A name for each of the maxima.
     :ivar maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
     :ivar previous_fit_parameters: If running multiple fits over time using a
       :class:`FitExperiment`, the result of the previous fit.
+    :ivar peak_name: The name of the peak, made from compounding the maxima names.
     """
-    def __init__(self, name: str, peak_bounds: Tuple[float, float],
+    def __init__(self, peak_bounds: Tuple[float, float], maxima_names: Union[str, List[str]],
                  maxima_bounds: List[Tuple[float, float]] = None):
         """
-        :param name: A name for the peak.
         :param peak_bounds: Where in the spectrum the peak begins and ends. The fit will be
           done over this region.
+        :param maxima_names: A name for each of the maxima.
         :param maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
         """
-        self.name = name
         self.peak_bounds = peak_bounds
+        if isinstance(maxima_names, str):
+            maxima_names = [maxima_names]
+        self.maxima_names = maxima_names
         if maxima_bounds:
             self.maxima_bounds = maxima_bounds
             self._check_maxima_bounds()
         else:
             self.maxima_bounds = [peak_bounds]
+        self._check_maxima_names()
+        self.peak_name = " ".join(maxima_names)
 
         self.previous_fit_parameters: Union[lmfit.Parameters, None] = None
 
@@ -48,8 +53,8 @@ class PeakParams:
         """String representation of PeakParams. Can be copy pasted for instantiation of new
         PeakParams."""
         if self.maxima_bounds[0] == self.peak_bounds:
-            return f"PeakParams('{self.name}', {self.peak_bounds})"
-        return f"PeakParams('{self.name}', {self.peak_bounds}, {self.maxima_bounds})"
+            return f"PeakParams({self.peak_bounds}, '{self.maxima_names}')"
+        return f"PeakParams({self.peak_bounds}, '{self.maxima_names}', {self.maxima_bounds})"
 
     def _check_maxima_bounds(self):
         """Check that the list of maxima bounds is a list of Tuples of length 2."""
@@ -57,6 +62,13 @@ class PeakParams:
             if len(maxima) != 2:
                 raise TypeError(f"Maximum location number {index + 1} is incorrect."
                                 "Should be a Tuple[float, float]")
+
+    def _check_maxima_names(self):
+        """Check that there is one name for each set of maxima bounds."""
+        if len(self.maxima_names) != len(self.maxima_bounds):
+            raise TypeError(f"Number of maxima does not match number of maxima names."
+                            f"{len(self.maxima_names)} names are specified and "
+                            f"{len(self.maxima_bounds)} maxima are specified.")
 
     def set_previous_fit(self, fit_params: lmfit.Parameters):
         """When passing the result of a previous fit to the next fit, the peak center may drift
@@ -112,15 +124,17 @@ class PeakFit:
     """An object containing data on the fit to a peak.
 
     :ivar name: The name of the peak.
+    :ivar maxima_names: The names of the maxima in the peak.
     :ivar raw_spectrum: The raw data to which the fit is made.
     :ivar result: The lmfit result of the fit.
     :ivar cake_numbers: The cake number each column in raw_spectrum refers to.
     """
-    def __init__(self, name: str):
+    def __init__(self, peak_params: PeakParams):
         """
-        :param name: The name of the peak.
+        :param peak_params: A PeakParams object describing the peak to be fitted.
         """
-        self.name = name
+        self.name = peak_params.peak_name
+        self.maxima_names = peak_params.maxima_names
         self.raw_spectrum: Union[None, np.ndarray] = None
         self.result: Union[None, lmfit.model.ModelResult] = None
         self.cake_numbers: List[int] = []
@@ -267,11 +281,11 @@ class FitSpectrum:
         if isinstance(peak_params, PeakParams):
             peak_params = [peak_params]
 
-        self.fit_time = {peak.name: 0 for peak in peak_params}
-        self.num_evaluations = {peak.name: 0 for peak in peak_params}
+        self.fit_time = {peak.peak_name: 0 for peak in peak_params}
+        self.num_evaluations = {peak.peak_name: 0 for peak in peak_params}
 
         for peak in peak_params:
-            new_fit = PeakFit(peak.name)
+            new_fit = PeakFit(peak)
             new_fit.raw_spectrum = self._get_spectrum_subset(cakes, peak.peak_bounds, merge_cakes)
             start = time.perf_counter()
             if merge_cakes:
@@ -287,15 +301,15 @@ class FitSpectrum:
             self.fitted_peaks.append(new_fit)
             # Debug for slow fits
             if new_fit.result.nfev > 500 and debug:
-                print(peak.name)
+                print(peak.peak_name)
                 print(new_fit.result.init_params)
                 print(new_fit.result.params)
                 new_fit.result.plot_fit(show_init=True, numpoints=500)
                 plt.show()
 
             # Accounting
-            self.num_evaluations[peak.name] = new_fit.result.nfev
-            self.fit_time[peak.name] = fit_time
+            self.num_evaluations[peak.peak_name] = new_fit.result.nfev
+            self.fit_time[peak.peak_name] = fit_time
             
         if self.verbose:
             print("Fitting complete.")
@@ -336,6 +350,9 @@ class FitSpectrum:
         for fit in self.fitted_peaks:
             if fit.name == name:
                 return fit
+            for maximum_name in fit.maxima_names:
+                if maximum_name == name:
+                    return fit
         raise KeyError(f"Fit: '{name}' not found")
 
 
@@ -421,7 +438,7 @@ class FitExperiment:
         self.frames_to_load = frames_to_load
 
         self.time_steps: List[FitSpectrum] = []
-        self.fit_report = FitReport([peak.name for peak in peak_params])
+        self.fit_report = FitReport([peak.peak_name for peak in peak_params])
 
     def run_analysis(self, reuse_fits=False, debug: bool = False):
         """Run a fit over multiple diffraction patterns.
@@ -464,7 +481,7 @@ class FitExperiment:
 
     def peak_names(self) -> List[str]:
         """List the names of the peaks specified for fitting in the PeakParams."""
-        return [peak.name for peak in self.peak_params]
+        return [peak.peak_name for peak in self.peak_params]
 
     def fit_parameters(self, peak_name: str) -> List[str]:
         """List the names of the parameters of the fit for a specified peak.
@@ -482,7 +499,7 @@ class FitExperiment:
         :returns: A NumPy array with x data in the first column, y data in the second column and
           the y-error in the third column.
         """
-        if peak_name not in [peak.name for peak in self.peak_params]:
+        if peak_name not in [peak.peak_name for peak in self.peak_params]:
             print(f"Peak '{peak_name}' not found in fitted peaks.")
             return None
         if fit_parameter not in self.fit_parameters(peak_name):

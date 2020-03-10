@@ -113,7 +113,7 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
             plt.axvline(max_x, ls="--", color="red")
         bottom, top = plt.ylim()
         if x_range[0] < range_center < x_range[1]:
-            plt.text(range_center, top, params.name, size=20, ha="center", va="bottom")
+            plt.text(range_center, top, params.peak_name, size=20, ha="center", va="bottom")
         plt.xlim(x_range)
 
 
