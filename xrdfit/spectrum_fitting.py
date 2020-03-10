@@ -537,6 +537,8 @@ class FitExperiment:
             time_steps = self._calculate_time_steps(num_time_steps)
         if peak_names is None:
             peak_names = self.peak_names()
+        if isinstance(peak_names, str):
+            peak_names = [peak_names]
         for time_step in time_steps:
             for name in peak_names:
                 if file_name:
