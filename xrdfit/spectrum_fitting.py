@@ -284,32 +284,30 @@ class FitSpectrum:
         self.fit_time = {peak.peak_name: 0 for peak in peak_params}
         self.num_evaluations = {peak.peak_name: 0 for peak in peak_params}
 
-        for peak in peak_params:
-            new_fit = PeakFit(peak)
-            new_fit.raw_spectrum = self._get_spectrum_subset(cakes, peak.peak_bounds, merge_cakes)
+        for peak_param in peak_params:
+            new_fit = PeakFit(peak_param)
+            new_fit.raw_spectrum = self._get_spectrum_subset(cakes, peak_param.peak_bounds, merge_cakes)
             start = time.perf_counter()
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
-                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak.maxima_bounds,
-                                           peak.previous_fit_parameters)
+                new_fit.result = do_pv_fit(new_fit.raw_spectrum, peak_param)
             else:
                 new_fit.cake_numbers = list(map(str, cakes))
                 stacked_spectrum = _get_stacked_spectrum(new_fit.raw_spectrum)
-                new_fit.result = do_pv_fit(stacked_spectrum, peak.maxima_bounds,
-                                           peak.previous_fit_parameters)
+                new_fit.result = do_pv_fit(stacked_spectrum, peak_param)
             fit_time = time.perf_counter() - start
             self.fitted_peaks.append(new_fit)
             # Debug for slow fits
             if new_fit.result.nfev > 500 and debug:
-                print(peak.peak_name)
+                print(peak_param.peak_name)
                 print(new_fit.result.init_params)
                 print(new_fit.result.params)
                 new_fit.result.plot_fit(show_init=True, numpoints=500)
                 plt.show()
 
             # Accounting
-            self.num_evaluations[peak.peak_name] = new_fit.result.nfev
-            self.fit_time[peak.peak_name] = fit_time
+            self.num_evaluations[peak_param.peak_name] = new_fit.result.nfev
+            self.fit_time[peak_param.peak_name] = fit_time
             
         if self.verbose:
             print("Fitting complete.")

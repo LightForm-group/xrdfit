@@ -4,4 +4,4 @@ pandas
 dill
 tqdm
 lmfit
-jupyter
+notebook

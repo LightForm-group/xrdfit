@@ -3,26 +3,25 @@ None of these functions should be called directly by users - these functions are
 methods in spectrum_fitting.
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 
 import lmfit
 import numpy as np
 
+if TYPE_CHECKING:
+    from spectrum_fitting import PeakParams
 
-def do_pv_fit(peak_data: np.ndarray, maxima_locations: List[Tuple[float, float]],
-              fit_parameters: lmfit.Parameters = None) -> lmfit.model.ModelResult:
+
+def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.ModelResult:
     """Pseudo-Voigt fit to the lattice plane peak intensity.
 
     :param peak_data: The data to be fitted, two theta values (x-data) in column 0 and intensity
       (y-data) in column 1.
-    :param maxima_locations: A list of Tuples indicating approximately where the maxima are in the
-      peak_data. These are used to make guesses for the initial parameters of the fit.
-    :param fit_parameters: If provided, use these parameters for the fit instead of guessing
-      parameters
+    :param peak_param: A PeakParams object describing the peak to be fitted.
     """
     model = None
-
-    num_maxima = len(maxima_locations)
+    fit_parameters = peak_param.previous_fit_parameters
+    num_maxima = len(peak_param.maxima_bounds)
 
     # Add one peak to the model for each maximum
     for maxima_num in range(num_maxima):
@@ -39,7 +38,13 @@ def do_pv_fit(peak_data: np.ndarray, maxima_locations: List[Tuple[float, float]]
 
     if not fit_parameters:
         fit_parameters = model.make_params()
-        fit_parameters = guess_params(fit_parameters, two_theta, intensity, maxima_locations)
+        fit_parameters = guess_params(fit_parameters, two_theta, intensity, peak_param.maxima_bounds)
+        # We can't use special characters in param names so have to save the user provided
+        # name in user_data.
+        for parameter in fit_parameters:
+            if parameter != "background":
+                parameter_num = int(parameter.split("_")[1])
+                fit_parameters[parameter].user_data = peak_param.maxima_names[parameter_num - 1]
 
     fit_result = model.fit(intensity, fit_parameters, x=two_theta)
 
