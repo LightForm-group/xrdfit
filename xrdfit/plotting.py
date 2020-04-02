@@ -7,14 +7,13 @@ import os
 import pathlib
 from typing import Tuple, List, Union, TYPE_CHECKING
 
-import lmfit
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
 # TYPE_CHECKING is False at runtime but allows Type hints in IDE
 if TYPE_CHECKING:
-    from xrdfit.spectrum_fitting import PeakParams
+    from xrdfit.spectrum_fitting import PeakParams, PeakFit
 
 matplotlib.rc('xtick', labelsize=14)
 matplotlib.rc('ytick', labelsize=14)
@@ -117,25 +116,23 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
         plt.xlim(x_range)
 
 
-def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
-                  fit_name: str, time_step: str = None, file_name: str = None, title: str = None):
+def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = None,
+                  title: str = None):
     """Plot the result of a peak fit as well as the raw data.
 
-    :param data: The raw data to plot. X-data in the first column, y-data in subsequent columns.
-    :param cake_numbers: The numbers of one or more cakes to plot.
-    :param fit_result: An lmfit Model Result. Used to plot the model fit.
-    :param fit_name: Used to generate the title of the plot.
+    :param peak_fit: The result of a peak fit
     :param time_step: If provided, used to generate the title of the plot.
     :param file_name: If provided used as a on disk location to save the plot.
     :param title: If provided, can be used to override the auto generated plot title.
     """
+    data = peak_fit.raw_spectrum
     # First plot the raw data
-    for index, cake_num in enumerate(cake_numbers):
+    for index, cake_num in enumerate(peak_fit.cake_numbers):
         plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label=f"Cake {cake_num}")
 
     # Now plot the fit
     x_data = np.linspace(np.min(data[:, 0]), np.max(data[:, 0]), 100)
-    y_fit = fit_result.model.eval(fit_result.params, x=x_data)
+    y_fit = peak_fit.result.model.eval(peak_fit.result.params, x=x_data)
     plt.plot(x_data, y_fit, 'k--', lw=1, label="Fit")
     # Do all the ancillaries to make the plot look good.
     plt.minorticks_on()
@@ -143,12 +140,17 @@ def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.m
     plt.xlabel(r'Two Theta ($^\circ$)')
     plt.ylabel('Intensity')
     plt.legend()
-    if time_step:
-        fit_name = f'Peak "{fit_name}" at t = {time_step}'
     if title:
-        plt.title(title)
-    else:
-        plt.title(fit_name)
+        plt.suptitle(title, va="bottom", fontsize=matplotlib.rcParams["axes.titlesize"])
+    elif time_step:
+        plt.suptitle(f'Peak fit at t = {time_step}', va="bottom",
+                     fontsize=matplotlib.rcParams["axes.titlesize"])
+
+    for index, maxima_name in enumerate(peak_fit.maxima_names):
+        maxima_center = peak_fit.result.params[f"maximum_{index + 1 }_center"]
+        plt.text(maxima_center, plt.ylim()[1] * 1.05, maxima_name, horizontalalignment="center",
+                 fontsize=matplotlib.rcParams["axes.titlesize"] * 0.8)
+
     plt.tight_layout()
     if file_name:
         file_name = pathlib.Path(file_name)

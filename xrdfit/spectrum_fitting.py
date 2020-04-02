@@ -148,8 +148,7 @@ class PeakFit:
         if self.raw_spectrum is None:
             print("Cannot plot fit peak as fitting has not been done yet.")
         else:
-            plotting.plot_peak_fit(self.raw_spectrum, self.cake_numbers, self.result, self.name,
-                                   time_step, file_name, title)
+            plotting.plot_peak_fit(self, time_step, file_name, title)
 
 
 class FitSpectrum:
