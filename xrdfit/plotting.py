@@ -89,14 +89,16 @@ def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool,
     plt.tight_layout()
 
 
-def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, float]):
+def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, float],
+                     label_angle: float):
     """A visualisation to show the PeakParams. Peak bounds are indicated by a shaded grey area.
     Maxima bounds are shown by a dashed green line for the min bound and a dashed red line for
     the max bound. This method is called with an active plot environment and plots the peak
     params on top.
 
-    :param peak_params: The peak params to plot
+    :param peak_params: The peak params to plot.
     :param x_range: If supplied, restricts the x-axis of the plot to this range.
+    :param label_angle: If supplied, the angle to rotate the maxima labels.
     """
     for params in peak_params:
         bounds_min = params.peak_bounds[0]
@@ -105,25 +107,27 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
         plt.axvline(bounds_min, ls="-", lw=1, color="grey")
         plt.axvline(bounds_max, ls="-", lw=1, color="grey")
         plt.axvspan(bounds_min, bounds_max, alpha=0.2, color='grey', hatch="/")
-        for param in params.maxima_bounds:
-            min_x = param[0]
-            max_x = param[1]
+        for name, maximum in zip(params.maxima_names, params.maxima_bounds):
+            min_x = maximum[0]
+            max_x = maximum[1]
+            center = (min_x + max_x) / 2
             plt.axvline(min_x, ls="--", color="green")
             plt.axvline(max_x, ls="--", color="red")
-        bottom, top = plt.ylim()
-        if x_range[0] < range_center < x_range[1]:
-            plt.text(range_center, top, params.peak_name, size=20, ha="center", va="bottom")
+            if x_range[0] < range_center < x_range[1]:
+                plt.text(center, plt.ylim()[1], name, ha="center", va="bottom",
+                         fontsize=matplotlib.rcParams["axes.titlesize"] * 0.8, rotation=label_angle)
         plt.xlim(x_range)
 
 
 def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = None,
-                  title: str = None):
+                  title: str = None, label_angle: float = None):
     """Plot the result of a peak fit as well as the raw data.
 
     :param peak_fit: The result of a peak fit
     :param time_step: If provided, used to generate the title of the plot.
     :param file_name: If provided used as a on disk location to save the plot.
     :param title: If provided, can be used to override the auto generated plot title.
+    :param label_angle: The angle to rotate maxima labels.
     """
     data = peak_fit.raw_spectrum
     # First plot the raw data
@@ -149,7 +153,7 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
     for index, maxima_name in enumerate(peak_fit.maxima_names):
         maxima_center = peak_fit.result.params[f"maximum_{index + 1 }_center"]
         plt.text(maxima_center, plt.ylim()[1] * 1.05, maxima_name, horizontalalignment="center",
-                 fontsize=matplotlib.rcParams["axes.titlesize"] * 0.8)
+                 fontsize=matplotlib.rcParams["axes.titlesize"] * 0.8, rotation=label_angle)
 
     plt.tight_layout()
     if file_name:
