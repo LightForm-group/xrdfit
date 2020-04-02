@@ -352,6 +352,9 @@ class FitSpectrum:
         for fit in self.fitted_peaks:
             if fit.name == name:
                 return fit
+        # If there are no matching peak names, loop through again and check for matches
+        # with maximum names
+        for fit in self.fitted_peaks:
             for maximum_name in fit.maxima_names:
                 if maximum_name == name:
                     return fit
@@ -486,12 +489,21 @@ class FitExperiment:
         return [peak.peak_name for peak in self.peak_params]
 
     def fit_parameters(self, peak_name: str) -> List[str]:
-        """List the names of the parameters of the fit for a specified peak.
+        """List the names of the parameters of the fit for a specified peak. The names are
+        modified from the internal lmfit names to the maxima names provided by the user.
 
         :param peak_name: The peak to list the parameters of.
         """
+        fit_parameters = []
         if self.time_steps:
-            return list(self.time_steps[0].get_fit(peak_name).result.values.keys())
+            for name, param in self.time_steps[0].get_fit(peak_name).result.params.items():
+                # Convert the internal lmfit parameter names to user friendly ones
+                if name != "background":
+                    parameter_name = f"{param.user_data}_{name.split('_')[-1]}"
+                    fit_parameters.append(parameter_name)
+                else:
+                    fit_parameters.append(name)
+        return fit_parameters
 
     def get_fit_parameter(self, peak_name: str, fit_parameter: str) -> Union[None, np.ndarray]:
         """Get the raw values and error of a fitting parameter over time.
@@ -501,12 +513,27 @@ class FitExperiment:
         :returns: A NumPy array with x data in the first column, y data in the second column and
           the y-error in the third column.
         """
-        if peak_name not in [peak.peak_name for peak in self.peak_params]:
-            print(f"Peak '{peak_name}' not found in fitted peaks.")
-            return None
+        # Check validity of peak name against known peak names
+        peak_names = [peak.peak_name for peak in self.peak_params]
+        if peak_name not in peak_names:
+            # If peak name not found, check for matches with maximum names
+            maxima_names = [peak.maxima_names for peak in self.peak_params]
+            # Flatten nested list
+            maxima_names = [item for sublist in maxima_names for item in sublist]
+            if peak_name not in maxima_names:
+                print(f"Peak '{peak_name}' not found in fitted peaks.")
+                return None
         if fit_parameter not in self.fit_parameters(peak_name):
-            print(f"Unknown fit parameter {fit_parameter} for peak {peak_name}")
+            print(f"Unknown fit parameter '{fit_parameter}' for peak '{peak_name}'.")
             return None
+
+        # This section translates the user friendly parameter name into the internal lmfit
+        # parameter name
+        if fit_parameter != "background":
+            maximum_name, param_type = fit_parameter.split("_")
+            peak_fit = self.time_steps[0].get_fit(peak_name)
+            name_index = peak_fit.maxima_names.index(maximum_name)
+            fit_parameter = f"maximum_{name_index + 1}_{param_type}"
 
         parameters = []
         for time_step in self.time_steps:

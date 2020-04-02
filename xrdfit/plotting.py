@@ -147,7 +147,7 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
     if title:
         plt.suptitle(title, va="bottom", fontsize=matplotlib.rcParams["axes.titlesize"])
     elif time_step:
-        plt.suptitle(f'Peak fit at t = {time_step}', va="bottom",
+        plt.suptitle(f'Fit at t = {time_step}', va="bottom",
                      fontsize=matplotlib.rcParams["axes.titlesize"])
 
     for index, maxima_name in enumerate(peak_fit.maxima_names):
@@ -199,6 +199,5 @@ def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_po
         plt.ylim(data_y_range)
 
     plt.xlabel("Time (s)")
-    plt.ylabel(fit_parameter.replace("_", " ").title())
-    plt.title("Peak {}".format(peak_name))
+    plt.ylabel(fit_parameter.replace('_', ' ').title())
     plt.show()
