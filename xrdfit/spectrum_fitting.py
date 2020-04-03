@@ -232,7 +232,7 @@ class FitSpectrum:
         :param label_angle: The angle to rotate maxima labels.
         """
         fit = self.get_fit(fit_name)
-        fit.plot(time_step, file_name, label_angle)
+        fit.plot(time_step, file_name, label_angle=label_angle)
 
     def plot_peak_params(self, peak_params: Union[PeakParams, List[PeakParams]],
                          cakes_to_plot: Union[int, List[int]],
@@ -290,7 +290,8 @@ class FitSpectrum:
 
         for peak_param in peak_params:
             new_fit = PeakFit(peak_param)
-            new_fit.raw_spectrum = self._get_spectrum_subset(cakes, peak_param.peak_bounds, merge_cakes)
+            new_fit.raw_spectrum = self._get_spectrum_subset(cakes, peak_param.peak_bounds,
+                                                             merge_cakes)
             start = time.perf_counter()
             if merge_cakes:
                 new_fit.cake_numbers = [" + ".join(map(str, cakes))]
@@ -418,7 +419,7 @@ class FitExperiment:
     :ivar time_steps: A list of :class:`FitSpectrum` one for each time step.
     :ivar fit_report: A :class:`FitReport` for this :class`FittingExperiment`.
     """
-    def __init__(self, spectrum_time: int, file_string: str, first_cake_angle: int,
+    def __init__(self, spectrum_time: float, file_string: str, first_cake_angle: int,
                  cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
                  merge_cakes: bool, frames_to_load: List[int] = None):
         """
@@ -473,8 +474,9 @@ class FitExperiment:
             # Prepare the PeakParams for the next time step.
             for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
                 if reuse_fits:
+                    pass
                     # Check signal to noise is good enough to reuse the params
-                    if _check_snr(peak_fit.result.params):
+                    if _check_snr(peak_fit.result):
                         peak_params.set_previous_fit(peak_fit.result.params)
                 # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
                 peak_params.adjust_maxima_bounds(peak_fit.result.params)
@@ -653,16 +655,23 @@ def load_dump(file_name: str) -> FitExperiment:
         return data
 
 
-def _check_snr(params: lmfit.Parameters) -> bool:
-    """ Iterate through params and check whether any of the maxima in params have a low
-    signal to noise ratio.
+def _check_snr(lmfit_result: lmfit.model.ModelResult) -> bool:
+    """Check whether any of the maxima in a peak fit have a low signal to noise ratio.
 
-    :param params: The parameters to check.
-    :return True if any fit has an signal to noise ratio of less than 2 else False.
+    :param lmfit_result: The lmfit result of a peak fit.
+    :return True if all fits have a good signal to noise ratio, else False.
     """
-    good_snr = True
-    for param_name in params:
-        if "snr" in param_name:
-            if params[param_name].value < 2:
-                good_snr = False
-    return good_snr
+
+    maxima_heights = [parameter.value for name, parameter in lmfit_result.params.items()
+                      if name.endswith("height")]
+    # Add background to height to get y-value of maxima
+    maxima_heights = np.array(maxima_heights) + lmfit_result.params["background"].value
+    y_data = lmfit_result.data
+    baseline_level = np.percentile(y_data, 60)
+    baseline_points = y_data[y_data < baseline_level]
+
+    maxima_snr = (maxima_heights - np.mean(baseline_points)) / np.std(baseline_points)
+    if all(maxima_snr) > 4:
+        return True
+    else:
+        return False

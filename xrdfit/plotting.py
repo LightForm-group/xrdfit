@@ -144,9 +144,9 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
     plt.xlabel(r'Two Theta ($^\circ$)')
     plt.ylabel('Intensity')
     plt.legend()
-    if title:
+    if title is not None:
         plt.suptitle(title, va="bottom", fontsize=matplotlib.rcParams["axes.titlesize"])
-    elif time_step:
+    elif time_step is not None:
         plt.suptitle(f'Fit at t = {time_step}', va="bottom",
                      fontsize=matplotlib.rcParams["axes.titlesize"])
 
