@@ -87,29 +87,29 @@ class PeakParams:
                                max=center_max)
         self.previous_fit_parameters = fit_params
 
-    def adjust_peak_bounds(self, fit_params: lmfit.Parameters):
+    def adjust_peak_bounds(self, fit_result: lmfit.model.ModelResult):
         """Adjust peak bounds to re-center the peak in the peak bounds.
 
-        :param fit_params: The final parameters of the previous fit.
+        :param fit_result: The final parameters of the previous fit.
         """
         centers = []
-        for name in fit_params:
+        for name in fit_result.params:
             if "center" in name:
-                centers.append(fit_params[name].value)
+                centers.append(fit_result.params[name].value)
         center = sum(centers) / len(centers)
 
         bound_width = self.peak_bounds[1] - self.peak_bounds[0]
         self.peak_bounds = (center - (bound_width / 2), center + (bound_width / 2))
 
-    def adjust_maxima_bounds(self, fit_params: lmfit.Parameters):
+    def adjust_maxima_bounds(self, fit_result: lmfit.model.ModelResult):
         """Adjust maxima bounds to re-center the maximum in the maximum bounds.
 
-        :param fit_params: The final parameters of the previous fit.
+        :param fit_result: The result of the previous fit.
         """
         peak_centers = []
-        for param in fit_params:
+        for param in fit_result.params:
             if "center" in param:
-                peak_centers.append(fit_params[param].value)
+                peak_centers.append(fit_result.params[param].value)
 
         new_maxima_bounds = []
         for center, maximum_bounds in zip(peak_centers, self.maxima_bounds):
@@ -474,13 +474,12 @@ class FitExperiment:
             # Prepare the PeakParams for the next time step.
             for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
                 if reuse_fits:
-                    pass
                     # Check signal to noise is good enough to reuse the params
-                    if _check_snr(peak_fit.result):
+                    if all(_get_peak_snr(peak_fit.result)) > 4:
                         peak_params.set_previous_fit(peak_fit.result.params)
                 # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
-                peak_params.adjust_maxima_bounds(peak_fit.result.params)
-                peak_params.adjust_peak_bounds(peak_fit.result.params)
+                peak_params.adjust_maxima_bounds(peak_fit.result)
+                peak_params.adjust_peak_bounds(peak_fit.result)
             self._update_fit_report(spectral_data)
 
         print("Analysis complete.")
@@ -655,11 +654,11 @@ def load_dump(file_name: str) -> FitExperiment:
         return data
 
 
-def _check_snr(lmfit_result: lmfit.model.ModelResult) -> bool:
-    """Check whether any of the maxima in a peak fit have a low signal to noise ratio.
+def _get_peak_snr(lmfit_result: lmfit.model.ModelResult) -> List[float]:
+    """Get the signal to noise ratio for each maxima in a peak fit.
 
     :param lmfit_result: The lmfit result of a peak fit.
-    :return True if all fits have a good signal to noise ratio, else False.
+    :return List of SNRs, one for each maximum.
     """
 
     maxima_heights = [parameter.value for name, parameter in lmfit_result.params.items()
@@ -671,7 +670,5 @@ def _check_snr(lmfit_result: lmfit.model.ModelResult) -> bool:
     baseline_points = y_data[y_data < baseline_level]
 
     maxima_snr = (maxima_heights - np.mean(baseline_points)) / np.std(baseline_points)
-    if all(maxima_snr) > 4:
-        return True
-    else:
-        return False
+
+    return maxima_snr
