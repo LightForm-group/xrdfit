@@ -16,6 +16,13 @@ import xrdfit.plotting as plotting
 from xrdfit.pv_fit import do_pv_fit
 
 
+class MaximumParams:
+    """An object representing information about a maximum within a peak."""
+    def __init__(self, name: str, bounds: Tuple[float, float]):
+        self.name = name
+        self.bounds = bounds
+
+
 class PeakParams:
     """An object containing information about a peak and its maxima.
 
@@ -38,37 +45,22 @@ class PeakParams:
         self.peak_bounds = peak_bounds
         if isinstance(maxima_names, str):
             maxima_names = [maxima_names]
-        self.maxima_names = maxima_names
-        if maxima_bounds:
-            self.maxima_bounds = maxima_bounds
-            self._check_maxima_bounds()
-        else:
-            self.maxima_bounds = [peak_bounds]
-        self._check_maxima_names()
+        self.maxima = self._add_maxima(peak_bounds, maxima_names, maxima_bounds)
+
         self.peak_name = " ".join(maxima_names)
 
         self.previous_fit_parameters: Union[lmfit.Parameters, None] = None
 
+    def get_maxima_names(self) -> List[str]:
+        return [maximum.name for maximum in self.maxima]
+
     def __str__(self) -> str:
         """String representation of PeakParams. Can be copy pasted for instantiation of new
         PeakParams."""
-        if self.maxima_bounds[0] == self.peak_bounds:
-            return f"PeakParams({self.peak_bounds}, '{self.maxima_names}')"
-        return f"PeakParams({self.peak_bounds}, '{self.maxima_names}', {self.maxima_bounds})"
-
-    def _check_maxima_bounds(self):
-        """Check that the list of maxima bounds is a list of Tuples of length 2."""
-        for index, maxima in enumerate(self.maxima_bounds):
-            if len(maxima) != 2:
-                raise TypeError(f"Maximum location number {index + 1} is incorrect."
-                                "Should be a Tuple[float, float]")
-
-    def _check_maxima_names(self):
-        """Check that there is one name for each set of maxima bounds."""
-        if len(self.maxima_names) != len(self.maxima_bounds):
-            raise TypeError(f"Number of maxima does not match number of maxima names."
-                            f"{len(self.maxima_names)} names are specified and "
-                            f"{len(self.maxima_bounds)} maxima are specified.")
+        if self.maxima[0] == self.peak_bounds:
+            return f"PeakParams({self.peak_bounds}, '{self.get_maxima_names()}')"
+        return f"PeakParams({self.peak_bounds}, '{self.get_maxima_names()}', " \
+               f"{[maximum.bounds for maximum in self.maxima]})"
 
     def set_previous_fit(self, fit_params: lmfit.Parameters):
         """When passing the result of a previous fit to the next fit, the peak center may drift
@@ -111,13 +103,31 @@ class PeakParams:
             if "center" in param:
                 peak_centers.append(fit_result.params[param].value)
 
-        new_maxima_bounds = []
-        for center, maximum_bounds in zip(peak_centers, self.maxima_bounds):
-            maximum_bound_width = maximum_bounds[1] - maximum_bounds[0]
+        for center, maximum in zip(peak_centers, self.maxima):
+            maximum_bound_width = maximum.bounds[1] - maximum.bounds[0]
             lower_bound = center - maximum_bound_width / 2
             upper_bound = center + maximum_bound_width / 2
-            new_maxima_bounds.append((lower_bound, upper_bound))
-        self.maxima_bounds = new_maxima_bounds
+            maximum.bounds = (lower_bound, upper_bound)
+
+    @staticmethod
+    def _add_maxima(peak_bounds: Tuple[float, float], maxima_names: List[str],
+                    maxima_bounds: Union[None, List[Tuple[float, float]]],) -> List[MaximumParams]:
+        """Given a list of maxima names and maxima bounds, generate a list of MaximaParams."""
+
+        num_maxima = len(maxima_names)
+        if maxima_bounds is None and num_maxima > 1:
+            raise TypeError(f"More than one maxima name specified so must provide maxima bounds.")
+        # For a single maximum where no bounds are specified, use peak bounds as maxima bounds.
+        if maxima_bounds is None:
+            maxima_bounds = [peak_bounds]
+        if num_maxima > 1:
+            if num_maxima != len(maxima_bounds):
+                raise TypeError(f"Number of maxima bounds does not match number of maxima names."
+                                f"{len(maxima_names)} names are specified and "
+                                f"{len(maxima_bounds)} maxima bounds are specified.")
+
+        maxima = [MaximumParams(name, bounds) for name, bounds in zip(maxima_names, maxima_bounds)]
+        return maxima
 
 
 class PeakFit:
@@ -134,7 +144,7 @@ class PeakFit:
         :param peak_params: A PeakParams object describing the peak to be fitted.
         """
         self.name = peak_params.peak_name
-        self.maxima_names = peak_params.maxima_names
+        self.maxima_names = peak_params.get_maxima_names()
         self.raw_spectrum: Union[None, np.ndarray] = None
         self.result: Union[None, lmfit.model.ModelResult] = None
         self.cake_numbers: List[int] = []
@@ -473,10 +483,10 @@ class FitExperiment:
 
             # Prepare the PeakParams for the next time step.
             for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
+                peak_snr = _get_peak_snr(peak_fit.result)
                 if reuse_fits:
                     # Check signal to noise is good enough to reuse the params
-                    if all(_get_peak_snr(peak_fit.result)) > 4:
-                        peak_params.set_previous_fit(peak_fit.result.params)
+                    peak_params.set_previous_fit(peak_fit.result.params)
                 # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
                 peak_params.adjust_maxima_bounds(peak_fit.result)
                 peak_params.adjust_peak_bounds(peak_fit.result)
@@ -518,7 +528,7 @@ class FitExperiment:
         peak_names = [peak.peak_name for peak in self.peak_params]
         if peak_name not in peak_names:
             # If peak name not found, check for matches with maximum names
-            maxima_names = [peak.maxima_names for peak in self.peak_params]
+            maxima_names = [peak.get_maxima_names() for peak in self.peak_params]
             # Flatten nested list
             maxima_names = [item for sublist in maxima_names for item in sublist]
             if peak_name not in maxima_names:
@@ -564,7 +574,7 @@ class FitExperiment:
         """
         data = self.get_fit_parameter(peak_name, fit_parameter)
         if data is not None:
-            plotting.plot_parameter(data, fit_parameter, peak_name, show_points, show_error,
+            plotting.plot_parameter(data, fit_parameter, show_points, show_error,
                                     scale_by_error)
 
     def plot_fits(self, num_time_steps: int = 5, peak_names: Union[List[str], str] = None,

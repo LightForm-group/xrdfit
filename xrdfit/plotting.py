@@ -107,14 +107,14 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
         plt.axvline(bounds_min, ls="-", lw=1, color="grey")
         plt.axvline(bounds_max, ls="-", lw=1, color="grey")
         plt.axvspan(bounds_min, bounds_max, alpha=0.2, color='grey', hatch="/")
-        for name, maximum in zip(params.maxima_names, params.maxima_bounds):
-            min_x = maximum[0]
-            max_x = maximum[1]
+        for maximum in params.maxima:
+            min_x = maximum.bounds[0]
+            max_x = maximum.bounds[1]
             center = (min_x + max_x) / 2
             plt.axvline(min_x, ls="--", color="green")
             plt.axvline(max_x, ls="--", color="red")
             if x_range[0] < range_center < x_range[1]:
-                plt.text(center, plt.ylim()[1], name, ha="center", va="bottom",
+                plt.text(center, plt.ylim()[1], maximum.name, ha="center", va="bottom",
                          fontsize=matplotlib.rcParams["axes.titlesize"] * 0.8, rotation=label_angle)
         plt.xlim(x_range)
 
@@ -166,15 +166,13 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
     plt.close()
 
 
-def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_points: bool,
+def plot_parameter(data: np.ndarray, fit_parameter: str, show_points: bool,
                    show_error: bool, scale_by_error: bool = False):
     """Plot a parameter of a fit against time.
 
     :param data: The data to plot, x data in the first column, y data in the second column and
       the y error in the third column.
     :param fit_parameter: The name of the parameter being plotted, used to generate the y-axis label
-    :param peak_name: The name of the peak to which the parameter corresponds. Used to generate the
-      plot title.
     :param show_points: Whether to show data points on the plot.
     :param show_error: Whether to show error bars on the plot.
     :param scale_by_error: If True auto scale the y-axis to the range of the error bars. If False,

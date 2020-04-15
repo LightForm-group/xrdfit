@@ -9,7 +9,7 @@ import lmfit
 import numpy as np
 
 if TYPE_CHECKING:
-    from spectrum_fitting import PeakParams
+    from spectrum_fitting import PeakParams, MaximumParams
 
 
 def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.ModelResult:
@@ -21,7 +21,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
     """
     model = None
     fit_parameters = peak_param.previous_fit_parameters
-    num_maxima = len(peak_param.maxima_bounds)
+    num_maxima = len(peak_param.maxima)
 
     # Add one peak to the model for each maximum
     for maxima_num in range(num_maxima):
@@ -37,13 +37,13 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
 
     if not fit_parameters:
         fit_parameters = model.make_params()
-        fit_parameters = guess_params(fit_parameters, two_theta, intensity, peak_param.maxima_bounds)
+        fit_parameters = guess_params(fit_parameters, two_theta, intensity, peak_param.maxima)
         # We can't use special characters in param names so have to save the user provided
         # name in user_data.
         for parameter in fit_parameters:
             if parameter != "background":
                 parameter_num = int(parameter.split("_")[1])
-                fit_parameters[parameter].user_data = peak_param.maxima_names[parameter_num - 1]
+                fit_parameters[parameter].user_data = peak_param.maxima[parameter_num - 1].name
 
     fit_result = model.fit(intensity, fit_parameters, x=two_theta)
 
@@ -51,34 +51,34 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
 
 
 def guess_params(params: lmfit.Parameters, x_data: np.ndarray, y_data: np.ndarray,
-                 maxima_ranges: List[Tuple[float, float]]) -> lmfit.Parameters:
+                 maxima_params: List["MaximumParams"]) -> lmfit.Parameters:
     """Given a dataset and some information about where the maxima are, guess some good initial
     values for the Pseudo-Voigt fit.
 
     :param params: The lmfit.Parameters instance to store the guessed parameters.
     :param x_data: The x data to be fitted.
     :param y_data: The y data to be fitted.
-    :param maxima_ranges: A pair of floats for each maximum indicating a range of x-values that
-      the maximum falls in.
+    :param maxima_params: The MaximaParams specified by the user.
     """
-    for index, maximum in enumerate(maxima_ranges):
-        maximum_mask = np.logical_and(x_data > maximum[0],
-                                      x_data < maximum[1])
+    for index, maximum in enumerate(maxima_params):
+        maximum_mask = np.logical_and(x_data > maximum.bounds[0],
+                                      x_data < maximum.bounds[1])
         maxima_x = x_data[maximum_mask]
         maxima_y = y_data[maximum_mask]
         center = maxima_x[np.argmax(maxima_y)]
 
-        max_sigma, min_sigma, sigma = guess_sigma(x_data, maximum)
+        max_sigma, min_sigma, sigma = guess_sigma(x_data, maximum.bounds)
         # When calculating amplitude take the maximum height of the peak but the minimum height
         # of the dataset overall. This is because the maximum_mask does not necessarily
         # include baseline points and we need the noise level.
         amplitude = (max(maxima_y) - min(y_data)) * 2 * sigma
         param_prefix = f"maximum_{index + 1}"
-        params.add(f"{param_prefix}_center", value=center, min=maximum[0], max=maximum[1])
+        params.add(f"{param_prefix}_center", value=center, min=maximum.bounds[0],
+                   max=maximum.bounds[1])
         params.add(f"{param_prefix}_sigma", value=sigma, min=min_sigma, max=max_sigma)
         params.add(f"{param_prefix}_fraction", value=0.2, min=0, max=1)
         params.add(f"{param_prefix}_amplitude", value=amplitude, min=0)
-    # Background should be > 0 but a little flexibility here improves the convergence of the fit.
+    # Background should be > 0, but a little flexibility here improves the convergence of the fit.
     params.add("background", value=min(y_data), min=-10, max=max(y_data))
     return params
 
