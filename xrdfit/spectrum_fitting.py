@@ -142,6 +142,7 @@ class PeakFit:
         self.raw_spectrum: Union[None, np.ndarray] = None
         self.result: Union[None, lmfit.model.ModelResult] = None
         self.cake_numbers: List[int] = []
+        self._maxima_snrs: List[float] = []
 
     def plot(self, time_step: str = None, file_name: str = None, title: str = None,
              label_angle: float = None):
@@ -155,6 +156,23 @@ class PeakFit:
             print("Cannot plot fit peak as fitting has not been done yet.")
         else:
             plotting.plot_peak_fit(self, time_step, file_name, title, label_angle)
+
+    def get_maxima_snrs(self) -> List[float]:
+        """Get the signal to noise ratio for each maxima in a PeakFit."""
+        if not self._maxima_snrs:
+            self._calculate_maxima_snrs()
+        return self._maxima_snrs
+
+    def _calculate_maxima_snrs(self):
+        """Calculate the signal to noise ratio for each maxima in a PeakFit."""
+        maxima_heights = [parameter.value for name, parameter in self.result.params.items()
+                          if name.endswith("height")]
+        # Add background to height to get y-value of maxima
+        maxima_heights = np.array(maxima_heights) + self.result.params["background"].value
+        y_data = self.result.data
+        baseline_level = np.percentile(y_data, 60)
+        baseline_points = y_data[y_data < baseline_level]
+        self._maxima_snrs = (maxima_heights - np.mean(baseline_points)) / np.std(baseline_points)
 
 
 class FitSpectrum:
@@ -475,19 +493,22 @@ class FitExperiment:
             spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes, debug)
             self.time_steps.append(spectral_data)
 
-            # Prepare the PeakParams for the next time step.
-            for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
-                peak_snr = _get_peak_snr(peak_fit.result)
-                if reuse_fits:
-                    # Check signal to noise is good enough to reuse the params
-                    peak_params.set_previous_fit(peak_fit.result.params)
-                # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
-                peak_params.adjust_maxima_bounds(peak_fit.result)
-                peak_params.adjust_peak_bounds(peak_fit.result)
+            self._prepare_peak_params(reuse_fits, spectral_data)
             self._update_fit_report(spectral_data)
 
         print("Analysis complete.")
         self.fit_report.print()
+
+    def _prepare_peak_params(self, reuse_fits, spectral_data):
+        """Prepare the PeakParams for the next time step."""
+        for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
+            peak_snr = peak_fit.get_maxima_snrs()
+            if reuse_fits:
+                # Check signal to noise is good enough to reuse the params
+                peak_params.set_previous_fit(peak_fit.result.params)
+            # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
+            peak_params.adjust_maxima_bounds(peak_fit.result)
+            peak_params.adjust_peak_bounds(peak_fit.result)
 
     def peak_names(self) -> List[str]:
         """List the names of the peaks specified for fitting in the PeakParams."""
@@ -656,23 +677,3 @@ def load_dump(file_name: str) -> FitExperiment:
         data = dill.load(input_file)
         print("Data successfully loaded from dump file.")
         return data
-
-
-def _get_peak_snr(lmfit_result: lmfit.model.ModelResult) -> List[float]:
-    """Get the signal to noise ratio for each maxima in a peak fit.
-
-    :param lmfit_result: The lmfit result of a peak fit.
-    :return List of SNRs, one for each maximum.
-    """
-
-    maxima_heights = [parameter.value for name, parameter in lmfit_result.params.items()
-                      if name.endswith("height")]
-    # Add background to height to get y-value of maxima
-    maxima_heights = np.array(maxima_heights) + lmfit_result.params["background"].value
-    y_data = lmfit_result.data
-    baseline_level = np.percentile(y_data, 60)
-    baseline_points = y_data[y_data < baseline_level]
-
-    maxima_snr = (maxima_heights - np.mean(baseline_points)) / np.std(baseline_points)
-
-    return maxima_snr
