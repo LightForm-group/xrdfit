@@ -17,7 +17,11 @@ from xrdfit.pv_fit import do_pv_fit
 
 
 class MaximumParams:
-    """An object representing information about a maximum within a peak."""
+    """An object representing information about a maximum within a peak.
+
+    :ivar name: The name of the maximum.
+    :ivar bounds: An upper and lower bound for the position of the center of the maximum.
+    """
     def __init__(self, name: str, bounds: Tuple[float, float]):
         self.name = name
         self.bounds = bounds
@@ -28,11 +32,10 @@ class PeakParams:
 
     :ivar peak_bounds: Where in the spectrum the peak begins and ends. The fit will be done over
       this region.
-    :ivar maxima_names: A name for each of the maxima.
-    :ivar maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
+    :ivar maxima: A MaximumParams for each of the maxima.
+    :ivar peak_name: The name of the peak, made from compounding the maxima names.
     :ivar previous_fit_parameters: If running multiple fits over time using a
       :class:`FitExperiment`, the result of the previous fit.
-    :ivar peak_name: The name of the peak, made from compounding the maxima names.
     """
     def __init__(self, peak_bounds: Tuple[float, float], maxima_names: Union[str, List[str]],
                  maxima_bounds: List[Tuple[float, float]] = None):
@@ -84,12 +87,8 @@ class PeakParams:
 
         :param fit_result: The final parameters of the previous fit.
         """
-        centers = []
-        for name in fit_result.params:
-            if "center" in name:
-                centers.append(fit_result.params[name].value)
+        centers = [val for name, val in fit_result.params() if "center" in name]
         center = sum(centers) / len(centers)
-
         bound_width = self.peak_bounds[1] - self.peak_bounds[0]
         self.peak_bounds = (center - (bound_width / 2), center + (bound_width / 2))
 
@@ -98,12 +97,8 @@ class PeakParams:
 
         :param fit_result: The result of the previous fit.
         """
-        peak_centers = []
-        for param in fit_result.params:
-            if "center" in param:
-                peak_centers.append(fit_result.params[param].value)
-
-        for center, maximum in zip(peak_centers, self.maxima):
+        for index, maximum in enumerate(self.maxima):
+            center = fit_result.params[f"maximum_{index + 1}_center"].value
             maximum_bound_width = maximum.bounds[1] - maximum.bounds[0]
             lower_bound = center - maximum_bound_width / 2
             upper_bound = center + maximum_bound_width / 2
@@ -113,7 +108,6 @@ class PeakParams:
     def _add_maxima(peak_bounds: Tuple[float, float], maxima_names: List[str],
                     maxima_bounds: Union[None, List[Tuple[float, float]]],) -> List[MaximumParams]:
         """Given a list of maxima names and maxima bounds, generate a list of MaximaParams."""
-
         num_maxima = len(maxima_names)
         if maxima_bounds is None and num_maxima > 1:
             raise TypeError(f"More than one maxima name specified so must provide maxima bounds.")
