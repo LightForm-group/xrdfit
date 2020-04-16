@@ -72,22 +72,26 @@ class PeakParams:
 
         :param fit_params: The final parameters of the previous fit.
         """
+        retained_parameters = lmfit.Parameters()
         for parameter in fit_params.values():
             if "center" in parameter.name:
                 center_value = parameter.value
                 center_range = parameter.max - parameter.min
                 center_min = center_value - (center_range / 2)
                 center_max = center_value + (center_range / 2)
-                fit_params.add(parameter.name, value=center_value, min=center_min,
-                               max=center_max)
-        self.previous_fit_parameters = fit_params
+                retained_parameters.add(parameter.name, value=center_value, min=center_min,
+                                    max=center_max)
+            else:
+                retained_parameters[parameter.name] = parameter
+
+        self.previous_fit_parameters = retained_parameters
 
     def adjust_peak_bounds(self, fit_result: lmfit.model.ModelResult):
         """Adjust peak bounds to re-center the peak in the peak bounds.
 
         :param fit_result: The final parameters of the previous fit.
         """
-        centers = [val for name, val in fit_result.params() if "center" in name]
+        centers = [fit_result.params[name].value for name in fit_result.params if "center" in name]
         center = sum(centers) / len(centers)
         bound_width = self.peak_bounds[1] - self.peak_bounds[0]
         self.peak_bounds = (center - (bound_width / 2), center + (bound_width / 2))
