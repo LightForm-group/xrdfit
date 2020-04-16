@@ -151,7 +151,7 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
                      fontsize=matplotlib.rcParams["axes.titlesize"])
 
     for index, maxima_name in enumerate(peak_fit.maxima_names):
-        maxima_center = peak_fit.result.params[f"maximum_{index + 1 }_center"]
+        maxima_center = peak_fit.result.params[f"maximum_{index}_center"]
         plt.text(maxima_center, plt.ylim()[1] * 1.05, maxima_name, horizontalalignment="center",
                  fontsize=matplotlib.rcParams["axes.titlesize"] * 0.8, rotation=label_angle)
 

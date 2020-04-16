@@ -25,7 +25,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
 
     # Add one peak to the model for each maximum
     for maxima_num in range(num_maxima):
-        prefix = f"maximum_{maxima_num + 1}_"
+        prefix = f"maximum_{maxima_num}_"
         if model:
             model += lmfit.models.PseudoVoigtModel(prefix=prefix)
         else:
@@ -43,7 +43,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
         for parameter in fit_parameters:
             if parameter != "background":
                 parameter_num = int(parameter.split("_")[1])
-                fit_parameters[parameter].user_data = peak_param.maxima[parameter_num - 1].name
+                fit_parameters[parameter].user_data = peak_param.maxima[parameter_num].name
 
     fit_result = model.fit(intensity, fit_parameters, x=two_theta)
 
@@ -61,8 +61,7 @@ def guess_params(params: lmfit.Parameters, x_data: np.ndarray, y_data: np.ndarra
     :param maxima_params: The MaximaParams specified by the user.
     """
     for index, maximum in enumerate(maxima_params):
-        maximum_mask = np.logical_and(x_data > maximum.bounds[0],
-                                      x_data < maximum.bounds[1])
+        maximum_mask = np.logical_and(x_data > maximum.bounds[0], x_data < maximum.bounds[1])
         maxima_x = x_data[maximum_mask]
         maxima_y = y_data[maximum_mask]
         center = maxima_x[np.argmax(maxima_y)]
@@ -72,7 +71,7 @@ def guess_params(params: lmfit.Parameters, x_data: np.ndarray, y_data: np.ndarra
         # of the dataset overall. This is because the maximum_mask does not necessarily
         # include baseline points and we need the noise level.
         amplitude = (max(maxima_y) - min(y_data)) * 2 * sigma
-        param_prefix = f"maximum_{index + 1}"
+        param_prefix = f"maximum_{index}"
         params.add(f"{param_prefix}_center", value=center, min=maximum.bounds[0],
                    max=maximum.bounds[1])
         params.add(f"{param_prefix}_sigma", value=sigma, min=min_sigma, max=max_sigma)

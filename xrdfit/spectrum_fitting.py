@@ -80,7 +80,7 @@ class PeakParams:
                 center_min = center_value - (center_range / 2)
                 center_max = center_value + (center_range / 2)
                 retained_parameters.add(parameter.name, value=center_value, min=center_min,
-                                    max=center_max)
+                                        max=center_max)
             else:
                 retained_parameters[parameter.name] = parameter
 
@@ -102,7 +102,7 @@ class PeakParams:
         :param fit_result: The result of the previous fit.
         """
         for index, maximum in enumerate(self.maxima):
-            center = fit_result.params[f"maximum_{index + 1}_center"].value
+            center = fit_result.params[f"maximum_{index}_center"].value
             maximum_bound_width = maximum.bounds[1] - maximum.bounds[0]
             lower_bound = center - maximum_bound_width / 2
             upper_bound = center + maximum_bound_width / 2
@@ -563,7 +563,7 @@ class FitExperiment:
             maximum_name, param_type = fit_parameter.split("_")
             peak_fit = self.time_steps[0].get_fit(peak_name)
             name_index = peak_fit.maxima_names.index(maximum_name)
-            fit_parameter = f"maximum_{name_index + 1}_{param_type}"
+            fit_parameter = f"maximum_{name_index}_{param_type}"
 
         parameters = []
         for time_step in self.time_steps:
