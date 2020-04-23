@@ -20,7 +20,6 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
     :param peak_param: A PeakParams object describing the peak to be fitted.
     """
     model = None
-    old_fit_parameters = peak_param.previous_fit_parameters
     num_maxima = len(peak_param.maxima)
 
     # Add one peak to the model for each maximum
@@ -35,10 +34,8 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
     two_theta = peak_data[:, 0]
     intensity = peak_data[:, 1]
 
-    # This generates the derived parameters as well as the fundamental parameters
-
-    new_fit_parameters = guess_params(model, old_fit_parameters, two_theta, intensity,
-                                      peak_param.maxima)
+    new_fit_parameters = guess_params(model, peak_param.previous_fit_parameters, two_theta,
+                                      intensity, peak_param.maxima)
     # We can't use special characters in param names so have to save the user provided
     # name in user_data.
     for parameter in new_fit_parameters:
@@ -63,7 +60,9 @@ def guess_params(model: lmfit.Model, old_fit_params: lmfit.Parameters,
     :param y_data: The y data to be fitted.
     :param maxima_params: The MaximaParams specified by the user.
     """
+    # This generates the derived parameters as well as the fundamental parameters
     new_fit_parameters = model.make_params()
+    # We then overwrite some of the params to add a good initial guess.
     for index, maximum in enumerate(maxima_params):
         prefix = f"maximum_{index}"
         # If the params have been passed on then use them

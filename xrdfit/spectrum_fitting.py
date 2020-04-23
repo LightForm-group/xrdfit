@@ -26,6 +26,9 @@ class MaximumParams:
         self.name = name
         self.bounds = bounds
 
+    def __repr__(self):
+        return f'"{self.name}" - Min: {self.bounds[0]}, Max: {self.bounds[1]}'
+
 
 class PeakParams:
     """An object containing information about a peak and its maxima.
@@ -65,22 +68,36 @@ class PeakParams:
         return f"PeakParams({self.peak_bounds}, '{self.get_maxima_names()}', " \
                f"{[maximum.bounds for maximum in self.maxima]})"
 
-    def set_previous_fit(self, fit_params: lmfit.Parameters):
-        """When passing the result of a previous fit to the next fit, the peak center may drift
-        over time. The limits for the next fit must be reset otherwise it will always have the
-        limits from the first fit.
+    def set_previous_fit(self, fit_params: lmfit.Parameters, maxima_snr: List[float],
+                         snr_cutoff: float):
+        """Peak fit parameters can be passed from the result of one fit to be initial parameters
+        for the next fit. Parameters are only passed on if the previous fit was good as defined
+        by the signal to noise ratio of the maxima. The signal to noise is assessed per maxima
+        meaning that it may be the case that only a subset of the parameters are reused.
+        In addition, the peak center may drift over time so the center parameter limits for the
+        next fit are reset.
+        The parameters to be used for the next fit are stored in the previous_fit_parameters
+        variable of the PeakParams object.
 
         :param fit_params: The final parameters of the previous fit.
+        :param maxima_snr: A measure of the signal to noise ratio for each maxima in the peak
+        :param snr_cutoff: The signal to noise ratio that defines whether a fit is good enough for
+        parameters to be carried over to the next fit.
         """
         retained_parameters = lmfit.Parameters()
         for parameter in fit_params.values():
-            if "center" in parameter.name:
-                center_value = parameter.value
-                center_range = parameter.max - parameter.min
-                center_min = center_value - (center_range / 2)
-                center_max = center_value + (center_range / 2)
-                retained_parameters.add(parameter.name, value=center_value, min=center_min,
-                                        max=center_max)
+            if parameter.name != "background":
+                maximum_index = int(parameter.name.split("_")[1])
+                if maxima_snr[maximum_index] > snr_cutoff:
+                    if "center" in parameter.name:
+                        center_value = parameter.value
+                        center_range = parameter.max - parameter.min
+                        center_min = center_value - (center_range / 2)
+                        center_max = center_value + (center_range / 2)
+                        retained_parameters.add(parameter.name, value=center_value, min=center_min,
+                                                max=center_max)
+                    else:
+                        retained_parameters[parameter.name] = parameter
             else:
                 retained_parameters[parameter.name] = parameter
 
@@ -506,10 +523,10 @@ class FitExperiment:
     def _prepare_peak_params(self, reuse_fits, spectral_data):
         """Prepare the PeakParams for the next time step."""
         for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
-            peak_snr = peak_fit.get_maxima_snrs()
+            maxima_snr = peak_fit.get_maxima_snrs()
             if reuse_fits:
                 # Check signal to noise is good enough to reuse the params
-                peak_params.set_previous_fit(peak_fit.result.params)
+                peak_params.set_previous_fit(peak_fit.result.params, maxima_snr, 4)
             # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
             peak_params.adjust_maxima_bounds(peak_fit.result)
             peak_params.adjust_peak_bounds(peak_fit.result)
