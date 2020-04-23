@@ -134,6 +134,8 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
     for index, cake_num in enumerate(peak_fit.cake_numbers):
         plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label=f"Cake {cake_num}")
 
+    title_size = matplotlib.rcParams["axes.titlesize"]
+
     # Now plot the fit
     x_data = np.linspace(np.min(data[:, 0]), np.max(data[:, 0]), 100)
     y_fit = peak_fit.result.model.eval(peak_fit.result.params, x=x_data)
@@ -145,15 +147,14 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
     plt.ylabel('Intensity')
     plt.legend()
     if title is not None:
-        plt.suptitle(title, va="bottom", fontsize=matplotlib.rcParams["axes.titlesize"])
+        plt.title(title, va="bottom", fontsize=title_size, pad=title_size * 1.8)
     elif time_step is not None:
-        plt.suptitle(f'Fit at t = {time_step}', va="bottom",
-                     fontsize=matplotlib.rcParams["axes.titlesize"])
+        plt.title(f'Fit at t = {time_step}', va="bottom", fontsize=title_size, pad=title_size * 1.8)
 
     for index, maxima_name in enumerate(peak_fit.maxima_names):
         maxima_center = peak_fit.result.params[f"maximum_{index}_center"]
         plt.text(maxima_center, plt.ylim()[1] * 1.05, maxima_name, horizontalalignment="center",
-                 fontsize=matplotlib.rcParams["axes.titlesize"] * 0.8, rotation=label_angle)
+                 fontsize=title_size * 0.8, rotation=label_angle)
 
     plt.tight_layout()
     if file_name:
