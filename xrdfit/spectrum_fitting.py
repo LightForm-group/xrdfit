@@ -16,16 +16,29 @@ import xrdfit.plotting as plotting
 from xrdfit.pv_fit import do_pv_fit
 
 
+class MaximumParams:
+    """An object representing information about a maximum within a peak.
+
+    :ivar name: The name of the maximum.
+    :ivar bounds: An upper and lower bound for the position of the center of the maximum.
+    """
+    def __init__(self, name: str, bounds: Tuple[float, float]):
+        self.name = name
+        self.bounds = bounds
+
+    def __repr__(self):
+        return f'"{self.name}" - Min: {self.bounds[0]}, Max: {self.bounds[1]}'
+
+
 class PeakParams:
     """An object containing information about a peak and its maxima.
 
     :ivar peak_bounds: Where in the spectrum the peak begins and ends. The fit will be done over
       this region.
-    :ivar maxima_names: A name for each of the maxima.
-    :ivar maxima_bounds: If there is more than one maxima, a bounding box for each peak center.
+    :ivar maxima: A MaximumParams for each of the maxima.
+    :ivar peak_name: The name of the peak, made from compounding the maxima names.
     :ivar previous_fit_parameters: If running multiple fits over time using a
       :class:`FitExperiment`, the result of the previous fit.
-    :ivar peak_name: The name of the peak, made from compounding the maxima names.
     """
     def __init__(self, peak_bounds: Tuple[float, float], maxima_names: Union[str, List[str]],
                  maxima_bounds: List[Tuple[float, float]] = None):
@@ -38,86 +51,98 @@ class PeakParams:
         self.peak_bounds = peak_bounds
         if isinstance(maxima_names, str):
             maxima_names = [maxima_names]
-        self.maxima_names = maxima_names
-        if maxima_bounds:
-            self.maxima_bounds = maxima_bounds
-            self._check_maxima_bounds()
-        else:
-            self.maxima_bounds = [peak_bounds]
-        self._check_maxima_names()
+        self.maxima = self._add_maxima(peak_bounds, maxima_names, maxima_bounds)
+
         self.peak_name = " ".join(maxima_names)
 
         self.previous_fit_parameters: Union[lmfit.Parameters, None] = None
 
+    def get_maxima_names(self) -> List[str]:
+        return [maximum.name for maximum in self.maxima]
+
     def __str__(self) -> str:
         """String representation of PeakParams. Can be copy pasted for instantiation of new
         PeakParams."""
-        if self.maxima_bounds[0] == self.peak_bounds:
-            return f"PeakParams({self.peak_bounds}, '{self.maxima_names}')"
-        return f"PeakParams({self.peak_bounds}, '{self.maxima_names}', {self.maxima_bounds})"
+        if self.maxima[0] == self.peak_bounds:
+            return f"PeakParams({self.peak_bounds}, '{self.get_maxima_names()}')"
+        return f"PeakParams({self.peak_bounds}, '{self.get_maxima_names()}', " \
+               f"{[maximum.bounds for maximum in self.maxima]})"
 
-    def _check_maxima_bounds(self):
-        """Check that the list of maxima bounds is a list of Tuples of length 2."""
-        for index, maxima in enumerate(self.maxima_bounds):
-            if len(maxima) != 2:
-                raise TypeError(f"Maximum location number {index + 1} is incorrect."
-                                "Should be a Tuple[float, float]")
-
-    def _check_maxima_names(self):
-        """Check that there is one name for each set of maxima bounds."""
-        if len(self.maxima_names) != len(self.maxima_bounds):
-            raise TypeError(f"Number of maxima does not match number of maxima names."
-                            f"{len(self.maxima_names)} names are specified and "
-                            f"{len(self.maxima_bounds)} maxima are specified.")
-
-    def set_previous_fit(self, fit_params: lmfit.Parameters):
-        """When passing the result of a previous fit to the next fit, the peak center may drift
-        over time. The limits for the next fit must be reset otherwise it will always have the
-        limits from the first fit.
+    def set_previous_fit(self, fit_params: lmfit.Parameters, maxima_snr: List[float],
+                         snr_cutoff: float):
+        """Peak fit parameters can be passed from the result of one fit to be initial parameters
+        for the next fit. Parameters are only passed on if the previous fit was good as defined
+        by the signal to noise ratio of the maxima. The signal to noise is assessed per maxima
+        meaning that it may be the case that only a subset of the parameters are reused.
+        In addition, the peak center may drift over time so the center parameter limits for the
+        next fit are reset.
+        The parameters to be used for the next fit are stored in the previous_fit_parameters
+        variable of the PeakParams object.
 
         :param fit_params: The final parameters of the previous fit.
+        :param maxima_snr: A measure of the signal to noise ratio for each maxima in the peak
+        :param snr_cutoff: The signal to noise ratio that defines whether a fit is good enough for
+        parameters to be carried over to the next fit.
         """
+        retained_parameters = lmfit.Parameters()
         for parameter in fit_params.values():
-            if "center" in parameter.name:
-                center_value = parameter.value
-                center_range = parameter.max - parameter.min
-                center_min = center_value - (center_range / 2)
-                center_max = center_value + (center_range / 2)
-                fit_params.add(parameter.name, value=center_value, min=center_min,
-                               max=center_max)
-        self.previous_fit_parameters = fit_params
+            if parameter.name != "background":
+                maximum_index = int(parameter.name.split("_")[1])
+                if maxima_snr[maximum_index] > snr_cutoff:
+                    if "center" in parameter.name:
+                        center_value = parameter.value
+                        center_range = parameter.max - parameter.min
+                        center_min = center_value - (center_range / 2)
+                        center_max = center_value + (center_range / 2)
+                        retained_parameters.add(parameter.name, value=center_value, min=center_min,
+                                                max=center_max)
+                    else:
+                        retained_parameters[parameter.name] = parameter
+            else:
+                retained_parameters[parameter.name] = parameter
 
-    def adjust_peak_bounds(self, fit_params: lmfit.Parameters):
+        self.previous_fit_parameters = retained_parameters
+
+    def adjust_peak_bounds(self, fit_result: lmfit.model.ModelResult):
         """Adjust peak bounds to re-center the peak in the peak bounds.
 
-        :param fit_params: The final parameters of the previous fit.
+        :param fit_result: The final parameters of the previous fit.
         """
-        centers = []
-        for name in fit_params:
-            if "center" in name:
-                centers.append(fit_params[name].value)
+        centers = [fit_result.params[name].value for name in fit_result.params if "center" in name]
         center = sum(centers) / len(centers)
-
         bound_width = self.peak_bounds[1] - self.peak_bounds[0]
         self.peak_bounds = (center - (bound_width / 2), center + (bound_width / 2))
 
-    def adjust_maxima_bounds(self, fit_params: lmfit.Parameters):
+    def adjust_maxima_bounds(self, fit_result: lmfit.model.ModelResult):
         """Adjust maxima bounds to re-center the maximum in the maximum bounds.
 
-        :param fit_params: The final parameters of the previous fit.
+        :param fit_result: The result of the previous fit.
         """
-        peak_centers = []
-        for param in fit_params:
-            if "center" in param:
-                peak_centers.append(fit_params[param].value)
-
-        new_maxima_bounds = []
-        for center, maximum_bounds in zip(peak_centers, self.maxima_bounds):
-            maximum_bound_width = maximum_bounds[1] - maximum_bounds[0]
+        for index, maximum in enumerate(self.maxima):
+            center = fit_result.params[f"maximum_{index}_center"].value
+            maximum_bound_width = maximum.bounds[1] - maximum.bounds[0]
             lower_bound = center - maximum_bound_width / 2
             upper_bound = center + maximum_bound_width / 2
-            new_maxima_bounds.append((lower_bound, upper_bound))
-        self.maxima_bounds = new_maxima_bounds
+            maximum.bounds = (lower_bound, upper_bound)
+
+    @staticmethod
+    def _add_maxima(peak_bounds: Tuple[float, float], maxima_names: List[str],
+                    maxima_bounds: Union[None, List[Tuple[float, float]]],) -> List[MaximumParams]:
+        """Given a list of maxima names and maxima bounds, generate a list of MaximaParams."""
+        num_maxima = len(maxima_names)
+        if maxima_bounds is None and num_maxima > 1:
+            raise TypeError(f"More than one maxima name specified so must provide maxima bounds.")
+        # For a single maximum where no bounds are specified, use peak bounds as maxima bounds.
+        if maxima_bounds is None:
+            maxima_bounds = [peak_bounds]
+        if num_maxima > 1:
+            if num_maxima != len(maxima_bounds):
+                raise TypeError(f"Number of maxima bounds does not match number of maxima names."
+                                f"{len(maxima_names)} names are specified and "
+                                f"{len(maxima_bounds)} maxima bounds are specified.")
+
+        maxima = [MaximumParams(name, bounds) for name, bounds in zip(maxima_names, maxima_bounds)]
+        return maxima
 
 
 class PeakFit:
@@ -134,10 +159,11 @@ class PeakFit:
         :param peak_params: A PeakParams object describing the peak to be fitted.
         """
         self.name = peak_params.peak_name
-        self.maxima_names = peak_params.maxima_names
+        self.maxima_names = peak_params.get_maxima_names()
         self.raw_spectrum: Union[None, np.ndarray] = None
         self.result: Union[None, lmfit.model.ModelResult] = None
         self.cake_numbers: List[int] = []
+        self._maxima_snrs: List[float] = []
 
     def plot(self, time_step: str = None, file_name: str = None, title: str = None,
              label_angle: float = None):
@@ -151,6 +177,23 @@ class PeakFit:
             print("Cannot plot fit peak as fitting has not been done yet.")
         else:
             plotting.plot_peak_fit(self, time_step, file_name, title, label_angle)
+
+    def get_maxima_snrs(self) -> List[float]:
+        """Get the signal to noise ratio for each maxima in a PeakFit."""
+        if not self._maxima_snrs:
+            self._calculate_maxima_snrs()
+        return self._maxima_snrs
+
+    def _calculate_maxima_snrs(self):
+        """Calculate the signal to noise ratio for each maxima in a PeakFit."""
+        maxima_heights = [parameter.value for name, parameter in self.result.params.items()
+                          if name.endswith("height")]
+        # Add background to height to get y-value of maxima
+        maxima_heights = np.array(maxima_heights) + self.result.params["background"].value
+        y_data = self.result.data
+        baseline_level = np.percentile(y_data, 60)
+        baseline_points = y_data[y_data < baseline_level]
+        self._maxima_snrs = (maxima_heights - np.mean(baseline_points)) / np.std(baseline_points)
 
 
 class FitSpectrum:
@@ -471,20 +514,22 @@ class FitExperiment:
             spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes, debug)
             self.time_steps.append(spectral_data)
 
-            # Prepare the PeakParams for the next time step.
-            for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
-                if reuse_fits:
-                    pass
-                    # Check signal to noise is good enough to reuse the params
-                    if _check_snr(peak_fit.result):
-                        peak_params.set_previous_fit(peak_fit.result.params)
-                # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
-                peak_params.adjust_maxima_bounds(peak_fit.result.params)
-                peak_params.adjust_peak_bounds(peak_fit.result.params)
+            self._prepare_peak_params(reuse_fits, spectral_data)
             self._update_fit_report(spectral_data)
 
         print("Analysis complete.")
         self.fit_report.print()
+
+    def _prepare_peak_params(self, reuse_fits, spectral_data):
+        """Prepare the PeakParams for the next time step."""
+        for peak_fit, peak_params in zip(spectral_data.fitted_peaks, self.peak_params):
+            maxima_snr = peak_fit.get_maxima_snrs()
+            if reuse_fits:
+                # Check signal to noise is good enough to reuse the params
+                peak_params.set_previous_fit(peak_fit.result.params, maxima_snr, 4)
+            # Move maxima bounds and peak bounds to keep shifting peaks centered in the bounds.
+            peak_params.adjust_maxima_bounds(peak_fit.result)
+            peak_params.adjust_peak_bounds(peak_fit.result)
 
     def peak_names(self) -> List[str]:
         """List the names of the peaks specified for fitting in the PeakParams."""
@@ -519,7 +564,7 @@ class FitExperiment:
         peak_names = [peak.peak_name for peak in self.peak_params]
         if peak_name not in peak_names:
             # If peak name not found, check for matches with maximum names
-            maxima_names = [peak.maxima_names for peak in self.peak_params]
+            maxima_names = [peak.get_maxima_names() for peak in self.peak_params]
             # Flatten nested list
             maxima_names = [item for sublist in maxima_names for item in sublist]
             if peak_name not in maxima_names:
@@ -535,7 +580,7 @@ class FitExperiment:
             maximum_name, param_type = fit_parameter.split("_")
             peak_fit = self.time_steps[0].get_fit(peak_name)
             name_index = peak_fit.maxima_names.index(maximum_name)
-            fit_parameter = f"maximum_{name_index + 1}_{param_type}"
+            fit_parameter = f"maximum_{name_index}_{param_type}"
 
         parameters = []
         for time_step in self.time_steps:
@@ -565,7 +610,7 @@ class FitExperiment:
         """
         data = self.get_fit_parameter(peak_name, fit_parameter)
         if data is not None:
-            plotting.plot_parameter(data, fit_parameter, peak_name, show_points, show_error,
+            plotting.plot_parameter(data, fit_parameter, show_points, show_error,
                                     scale_by_error)
 
     def plot_fits(self, num_time_steps: int = 5, peak_names: Union[List[str], str] = None,
@@ -653,25 +698,3 @@ def load_dump(file_name: str) -> FitExperiment:
         data = dill.load(input_file)
         print("Data successfully loaded from dump file.")
         return data
-
-
-def _check_snr(lmfit_result: lmfit.model.ModelResult) -> bool:
-    """Check whether any of the maxima in a peak fit have a low signal to noise ratio.
-
-    :param lmfit_result: The lmfit result of a peak fit.
-    :return True if all fits have a good signal to noise ratio, else False.
-    """
-
-    maxima_heights = [parameter.value for name, parameter in lmfit_result.params.items()
-                      if name.endswith("height")]
-    # Add background to height to get y-value of maxima
-    maxima_heights = np.array(maxima_heights) + lmfit_result.params["background"].value
-    y_data = lmfit_result.data
-    baseline_level = np.percentile(y_data, 60)
-    baseline_points = y_data[y_data < baseline_level]
-
-    maxima_snr = (maxima_heights - np.mean(baseline_points)) / np.std(baseline_points)
-    if all(maxima_snr) > 4:
-        return True
-    else:
-        return False
