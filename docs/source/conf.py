@@ -18,8 +18,8 @@
 # -- Project information -----------------------------------------------------
 
 project = 'xrdfit'
-copyright = '2019, Peter Crowther'
-author = 'Peter Crowther'
+copyright = '2019, Peter Crowther and Christopher Daniel'
+author = 'Peter Crowther and Christopher Daniel'
 
 # The full version, including alpha/beta/rc tags
 release = '0.1.1'

@@ -7,7 +7,7 @@ setup(
     name='xrdfit',
     version='0.1.1',
     description='Automated fitting of XRD peaks using Pseudo-Voight fits',
-    author='Peter Crowther',
+    author='Peter Crowther and Christopher Daniel',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/LightForm-group/xrdfit",
