@@ -17,7 +17,7 @@ authors:
     orcid: 0000-0002-5574-6833
     affiliation: 1
 affiliations:
- - name: Univeristy of Manchester
+ - name: Univeristy of Manchester, UK
    index: 1
 date: 12 May 2020
 bibliography: paper.bib
