@@ -34,7 +34,7 @@ The evolution of peak profiles in synchrotron X-ray diffraction (SXRD) data can 
 
 ``xrdfit`` is designed to be accessible for all researchers who need to process SXRD (and XRD) spectra and so does not require a detailed knowledge of programming or fitting. The package has been used for the analysis of data taken during the hot deformation of a two-phase titanium alloy, which is presented in an article currently in press [@Daniel_2019], and will be used for future studies investigating the high temperature processing of metals in our research group. We hope that its public release will allow other researchers to benefit from fast data fitting, reducing the effort required to analyse their experimental data.
 
-![An example analysis of a two-phase titanium (Ti-6Al-4V) alloy during high temperature and high strain rate deformation, showing characteristic shifts of the \alpha (0002) peak centre. The shifts of the peak can be used to calculate elastic lattice straining in the hexagonal close-packed (hcp) lattice, as well as measure the thermal contraction on cooling.\label{fig:figure2}](figure2.eps)
+![An example analysis of a two-phase titanium (Ti-6Al-4V) alloy during high temperature and high strain rate deformation, showing characteristic shifts of the $\alpha$ (0002) peak centre. The shifts of the peak can be used to calculate elastic lattice straining in the hexagonal close-packed (hcp) lattice, as well as measure the thermal contraction on cooling.\label{fig:figure2}](figure2.eps)
 
 # Acknowledgements
 
