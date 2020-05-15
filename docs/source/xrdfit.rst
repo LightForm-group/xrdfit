@@ -1,17 +1,6 @@
 xrdfit package
 ==============
 
-Submodules
-----------
-
-xrdfit.fit\_analysis module
----------------------------
-
-.. automodule:: xrdfit.fit_analysis
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 xrdfit.plotting module
 ----------------------
 
@@ -32,15 +21,6 @@ xrdfit.spectrum\_fitting module
 -------------------------------
 
 .. automodule:: xrdfit.spectrum_fitting
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
-Module contents
----------------
-
-.. automodule:: xrdfit
    :members:
    :undoc-members:
    :show-inheritance:

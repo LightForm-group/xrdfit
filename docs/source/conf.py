@@ -18,11 +18,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'xrdfit'
-copyright = '2019, Peter Crowther'
-author = 'Peter Crowther'
+copyright = '2019, Peter Crowther and Christopher Daniel'
+author = 'Peter Crowther and Christopher Daniel'
 
 # The full version, including alpha/beta/rc tags
-release = '0.1'
+release = '0.1.1'
 
 
 # -- General configuration ---------------------------------------------------
@@ -67,3 +67,6 @@ html_theme_options = {"body_max_width": "100%"}
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+# -- Autodoc options --------------------
+autoclass_content = 'both'
