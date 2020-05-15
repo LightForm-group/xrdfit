@@ -82,7 +82,7 @@ class PeakParams:
         :param fit_params: The final parameters of the previous fit.
         :param maxima_snr: A measure of the signal to noise ratio for each maxima in the peak
         :param snr_cutoff: The signal to noise ratio that defines whether a fit is good enough for
-        parameters to be carried over to the next fit.
+          parameters to be carried over to the next fit.
         """
         retained_parameters = lmfit.Parameters()
         for parameter in fit_params.values():

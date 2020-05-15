@@ -1,7 +1,7 @@
 xrdfit documentation
 ======================
 
-``xrdfit`` is a Python package for fitting the diffraction peaks in synchrotron X-ray diffraction (SXRD) and XRD spectra. It is intended as an easy to use tool for the quick analysis of individual and overlapping lattice plane peaks, to discern the peak position and profile. ``xrdfit`` uses the Python package `lmfit <https://lmfit.github.io/lmfit-py/>`_ for the underlying fitting. Features are included for selecting different 'cakes' of data and automating fitting over many spectra, to enable tracking of peaks as they shift throughout the experiment. ``xrdfit`` is designed to be used by experimental researchers who need to process SXRD spectra but do not have a detailed knowledge of programming or fitting.
+``xrdfit`` is a Python package for fitting the diffraction peaks in synchrotron X-ray diffraction (SXRD) and XRD spectra. It is intended as an easy to use tool for the quick analysis of individual and overlapping lattice plane peaks, to quantify the peak positions and profiles. ``xrdfit`` uses the Python package `lmfit <https://lmfit.github.io/lmfit-py/>`_ for the underlying fitting. Features are included for selecting different 'cakes' of data and automating fitting over many spectra, to enable tracking of peaks as they shift throughout the experiment. ``xrdfit`` is designed to be used by experimental researchers who need to process SXRD spectra but do not have a detailed knowledge of programming or fitting.
 
 
 Installation
@@ -16,14 +16,13 @@ Use :command:`pip` to install the latest stable version of ``xrdfit``:
    pip install xrdfit
 
 The current development version is available on `github
-<https://github.com/LightForm-group/xrdfit>`__. Use :command:`git` and
-:command:`python setup.py` to install it:
+<https://github.com/LightForm-group/xrdfit>`__. To install use:
 
 .. code-block:: console
 
-   git clone https://github.com/LightForm-group/xrdfit
+   git clone --branch develop https://github.com/LightForm-group/xrdfit
    cd xrdfit
-   python setup.py install
+   python -m pip install . 
 
 
 Getting started
