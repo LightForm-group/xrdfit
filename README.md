@@ -5,7 +5,7 @@
 Introduction
 --------------
 
-xrdfit is a Python module for fitting the peaks found in shallow x-ray diffraction spectra. It is designed to be an easy to use tool for quick analysis of spectra. Features are included for automating fitting over many spectra to enable tracking of peaks as they shift through the experiment. xrdfit uses the Python module lmfit for the underlying fitting. xrdfit is designed to be accessible for all researchers who need to process SXRD spectra and so does not require a detailed knowledge of programming or fitting.
+xrdfit is a Python package for fitting the diffraction peaks in synchrotron X-ray diffraction (SXRD) and XRD spectra. It is designed to be an easy to use tool for quick analysis of spectra. Features are included for automating fitting over many spectra to enable tracking of peaks as they shift throughout an experiment. xrdfit uses the Python module lmfit for the underlying fitting. xrdfit is designed to be accessible for all researchers who need to process SXRD spectra and so does not require a detailed knowledge of programming or fitting.
 
 Installation
 -------------
