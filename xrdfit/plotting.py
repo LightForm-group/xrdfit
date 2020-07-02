@@ -29,10 +29,13 @@ def plot_polar_heat_map(num_cakes: int, rad: List[int], z_data: np.ndarray, firs
     :param rad: The radial bin edges.
     :param z_data: A num_cakes by rad shaped array of data to plot.
     :param first_cake_angle: The angle clockwise from vertical at which to label the first cake."""
+    degrees_per_cake = 360 / num_cakes
+    half_cake_angle = degrees_per_cake / 2
+
     azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
     r, theta = np.meshgrid(rad, azm)
     plt.subplot(projection="polar", theta_direction=-1,
-                theta_offset=np.deg2rad(360 / num_cakes / 2))
+                theta_offset=np.deg2rad(half_cake_angle + first_cake_angle))
     plt.pcolormesh(theta, r, z_data.T)
     plt.plot(azm, r, ls='none')
     plt.grid()
@@ -40,14 +43,15 @@ def plot_polar_heat_map(num_cakes: int, rad: List[int], z_data: np.ndarray, firs
     plt.thetagrids([theta * 360 / num_cakes for theta in range(num_cakes)], labels=[])
     # Turn off radial grid lines
     plt.rgrids([])
-    # Put the cake numbers in the right places
+    # Put the cake numbers in the right places. The maths for the label angles is really screwy
+    # because setting theta_direction to -1 doesnt seem to affect get_xaxis_text1_transform
+    # which is still trying to rotate the labels anticlockwise. It works anyway.
     ax = plt.gca()
     trans, _, _ = ax.get_xaxis_text1_transform(0)
-    degrees_per_cake = 360/num_cakes
-    half_cake = degrees_per_cake / 2
     for label in range(1, num_cakes + 1):
-        ax.text(np.deg2rad(label * degrees_per_cake - 90 - half_cake + first_cake_angle), -0.1,
-                label, transform=trans, rotation=0, ha="center", va="center")
+        ax.text(
+            np.deg2rad((label * degrees_per_cake - half_cake_angle - 90 + 2 * first_cake_angle)),
+            -0.1, label, transform=trans, rotation=0, ha="center", va="center")
     plt.show()
 
 
