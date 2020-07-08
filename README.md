@@ -1,6 +1,7 @@
 [![PyPI version](https://badge.fury.io/py/xrdfit.svg)](https://badge.fury.io/py/xrdfit)
 [![Documentation Status](https://readthedocs.org/projects/xrdfit/badge/?version=latest)](https://xrdfit.readthedocs.io/en/latest/?badge=latest)
-[![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007) 
+[![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/LightForm-group/xrdfit/v1.0.0?filepath=%2Ftutorial%20notebooks)
 
 Introduction
 --------------
@@ -28,6 +29,11 @@ Documentation including an API reference is provided at: https://xrdfit.readthed
 The majority of the documentation is provided as example driven interactive Jupyter notebooks. These are included along with the source code in the "tutorial notebooks" folder.
 If this package was downloaded from pip, the source can be found on GitHub: https://github.com/LightForm-group/xrdfit
 
+Try it out
+-------------
+
+You can try out `xrdfit` directly in your browser with Binder: https://mybinder.org/v2/gh/LightForm-group/xrdfit/v1.0.0?filepath=%2Ftutorial%20notebooks
+Note that `Tutorial Notebook 4` will not run correctly in Binder as it requires the download of a supplementary dataset (https://zenodo.org/record/3630511#.XjHhJGj7SUl) which is not included in the source repository due to its size.
 
 Required libraries
 --------------------
