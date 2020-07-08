@@ -35,6 +35,13 @@ Try it out
 You can try out `xrdfit` directly in your browser with Binder: https://mybinder.org/v2/gh/LightForm-group/xrdfit/v1.0.0?filepath=%2Ftutorial%20notebooks
 Note that `Tutorial Notebook 4` will not run correctly in Binder as it requires the download of a supplementary dataset (https://zenodo.org/record/3630511#.XjHhJGj7SUl) which is not included in the source repository due to its size.
 
+Compatibility
+--------------
+
+The code was developed and tested with Python version 3.8. The minimum required Python version is 3.6. If you install the dependencies of xrdfit using the 
+specification in requirements.txt, this will use the same package versions used by the developers. While this is good for reproducibility, it is worth noting that
+if you are using a newer Python version > 3.8, some of these packages may not have binary wheels for your version and may require compilation.
+
 Required libraries
 --------------------
 
