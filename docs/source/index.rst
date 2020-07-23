@@ -35,6 +35,36 @@ The primary source of documentation for new users is a series of tutorial Jupyte
 The source and notebooks are available on the project’s GitHub page: `<https://github.com/LightForm-group/xrdfit>`_
 
 
+Comparison to other peak fitting tools
+========================================
+
+DAWN
+-----
+
+DAWN `<https://dawnsci.org/>`_ is a multipurpose framework, developed to deal with analysis of a whole range of
+datasets measured from beamline experiments. It is the most comparable tool we have come across in in terms of its
+ability to do simple fits like those done by `xrdfit`.
+
+Testing the fitting of a clear single peak for a dataset of 1000 spectra we find that DAWN typically takes 1-2 seconds
+per image and provides only limited information about the result of the fit. It also only appears to allow fitting of
+a single peak at a time, fitting multiple peaks would mean running the same analysis each time for each peak.
+We found that the program crashed when attempting to load more than 1000 spectra for analysis.
+
+For `xrdfit`, fitting of the same peak is on the order of 0.05 seconds per spectra. It is also possible to set up
+an analysis to fit multiple peaks simultaneously which greatly speeds the analysis of a full spectrum. Fitting is
+much more interactive, meaning that it is possible to more quickly determine if fits are correct and modify them if
+necessary. `xrdfit` can also easily deal with large datasets.
+
+MAUD
+-----
+
+MAUD can be used to fit peaks in diffraction spectra but uses a Rietveld refinement method to match a model of the
+material properties and the beamline setup to the data. This method provides different information about the material
+but because MAUD uses a model of the unit cell to fit the data, there is some averaging of the overall fit and a larger
+error in the individual peak position. In addition, automation of fitting in MAUD is complex and depends on identifying
+peaks using the user interface which can't be used as part of a reproducible analysis.
+
+
 Acknowledgements
 =================
 
