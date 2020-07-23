@@ -26,8 +26,11 @@ class MaximumParams:
         self.name = name
         self.bounds = bounds
 
-    def __repr__(self):
+    def __str__(self):
         return f'"{self.name}" - Min: {self.bounds[0]}, Max: {self.bounds[1]}'
+
+    def __repr__(self):
+        return f'<{str(self)}>'
 
 
 class PeakParams:
@@ -57,16 +60,22 @@ class PeakParams:
 
         self.previous_fit_parameters: Union[lmfit.Parameters, None] = None
 
+    def __str__(self) -> str:
+        """String representation of PeakParams. Can be copy/pasted for instantiation of new
+        PeakParams."""
+        string = f"PeakParams({self.peak_bounds}, {self.get_maxima_names()})"
+        if self.maxima[0] != self.peak_bounds:
+            string += f", {[maximum.bounds for maximum in self.maxima]})"
+        return string
+
+    def __repr__(self):
+        string = f"<PeakParams({self.peak_bounds}, maxima: {self.get_maxima_names()})>"
+        if self.maxima[0] != self.peak_bounds:
+            string += f", maxima bounds: {[maximum.bounds for maximum in self.maxima]})"
+        return string
+
     def get_maxima_names(self) -> List[str]:
         return [maximum.name for maximum in self.maxima]
-
-    def __str__(self) -> str:
-        """String representation of PeakParams. Can be copy pasted for instantiation of new
-        PeakParams."""
-        if self.maxima[0] == self.peak_bounds:
-            return f"PeakParams({self.peak_bounds}, '{self.get_maxima_names()}')"
-        return f"PeakParams({self.peak_bounds}, '{self.get_maxima_names()}', " \
-               f"{[maximum.bounds for maximum in self.maxima]})"
 
     def set_previous_fit(self, fit_params: lmfit.Parameters, maxima_snr: List[float],
                          snr_cutoff: float):
@@ -165,6 +174,12 @@ class PeakFit:
         self.cake_numbers: List[int] = []
         self._maxima_snrs: List[float] = []
 
+    def __str__(self):
+        return f"Name: {self.name}, fit complete: {bool(self.result)}"
+
+    def __repr__(self):
+        return f'<{str(self)}>'
+
     def plot(self, time_step: str = None, file_name: str = None, title: str = None,
              label_angle: float = None, log_scale=False):
         """ Plot the raw spectral data and the fit.
@@ -225,6 +240,13 @@ class FitSpectrum:
         self.spectral_data = pd.read_table(file_path).to_numpy()
         if self.verbose:
             print("Diffraction pattern successfully loaded from file.")
+
+    def __str__(self):
+        return f"FitSpectrum with {self.spectral_data.shape[1] - 1} cakes. " \
+               f"Num fitted peaks: {len(self.fitted_peaks)}"
+
+    def __repr__(self):
+        return f'<{str(self)}>'
 
     def plot_polar(self):
         """Plot the whole diffraction pattern on polar axes."""
@@ -493,6 +515,12 @@ class FitExperiment:
 
         self.time_steps: List[FitSpectrum] = []
         self.fit_report = FitReport([peak.peak_name for peak in peak_params])
+
+    def __str__(self):
+        return f'FitExperiment with {len(self.time_steps)} time steps.'
+
+    def __repr__(self):
+        return f'<{str(self)}>'
 
     def run_analysis(self, reuse_fits=False, debug: bool = False):
         """Run a fit over multiple diffraction patterns.
