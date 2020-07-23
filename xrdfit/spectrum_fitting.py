@@ -4,6 +4,7 @@ import bz2
 import glob
 import time
 from typing import List, Tuple, Union
+import logging
 
 import numpy as np
 import lmfit
@@ -14,6 +15,9 @@ import dill
 
 import xrdfit.plotting as plotting
 from xrdfit.pv_fit import do_pv_fit
+
+
+logging.basicConfig(level=logging.WARNING)
 
 
 class MaximumParams:
@@ -175,7 +179,7 @@ class PeakFit:
         self._maxima_snrs: List[float] = []
 
     def __str__(self):
-        return f"Name: {self.name}, fit complete: {bool(self.result)}"
+        return f"PeakFit {self.name}, fit complete: {bool(self.result)}"
 
     def __repr__(self):
         return f'<{str(self)}>'
@@ -190,7 +194,7 @@ class PeakFit:
         :param log_scale: Whether to plot the y-axis in a log or linear scale.
         """
         if self.raw_spectrum is None:
-            print("Cannot plot fit peak as fitting has not been done yet.")
+            logging.warning("Cannot plot fit peak as fitting has not been done yet.")
         else:
             plotting.plot_peak_fit(self, time_step, file_name, title, label_angle,
                                    log_scale=log_scale)
@@ -216,7 +220,6 @@ class PeakFit:
 class FitSpectrum:
     """An object that stores data about a spectrum and its fitted peaks.
 
-    :ivar verbose: Whether or not to print fit status to the console.
     :ivar first_cake_angle: The angle of the first cake in the data file in degrees
       clockwise from North.
     :ivar fitted_peaks: Fits to peaks in the spectrum.
@@ -224,22 +227,19 @@ class FitSpectrum:
     :ivar fit_time: A dict of peak names and the time taken to evaluate that fit.
     :ivar spectral_data: Data for the whole diffraction pattern.
     """
-    def __init__(self, file_path: str, first_cake_angle: int = 90, verbose: bool = True):
+    def __init__(self, file_path: str, first_cake_angle: int = 90):
         """
         :param file_path: The path of the file containing scattering data to load.
         :param first_cake_angle: The angle of the first cake in the data file in degrees
           clockwise from North.
-        :param verbose: Whether or not to print fit status to the console
         """
-        self.verbose = verbose
         self.first_cake_angle = first_cake_angle
         self.fitted_peaks: List[PeakFit] = []
         self.num_evaluations = {}
         self.fit_time = {}
 
         self.spectral_data = pd.read_table(file_path).to_numpy()
-        if self.verbose:
-            print("Diffraction pattern successfully loaded from file.")
+        print("Diffraction pattern successfully loaded from file.")
 
     def __str__(self):
         return f"FitSpectrum with {self.spectral_data.shape[1] - 1} cakes. " \
@@ -340,14 +340,13 @@ class FitSpectrum:
         plt.show()
 
     def fit_peaks(self, peak_params: Union[PeakParams, List[PeakParams]],
-                  cakes: Union[int, List[int]], merge_cakes: bool = False, debug: bool = False):
+                  cakes: Union[int, List[int]], merge_cakes: bool = False):
         """Attempt to fit peaks within the ranges specified by :class:`PeakParams`.
 
         :param peak_params: A list of :class:`PeakParams` describing the peaks to be fitted.
         :param cakes: Which cakes to fit.
         :param merge_cakes: If True and multiple cakes are specified then sum the cakes before
           fitting. Else do the fit to multiple cakes simultaneously.
-        :param debug: Whether to show debug info for slow fits.
         """
         self.fitted_peaks = []
         if isinstance(cakes, int):
@@ -373,19 +372,16 @@ class FitSpectrum:
             fit_time = time.perf_counter() - start
             self.fitted_peaks.append(new_fit)
             # Debug for slow fits
-            if new_fit.result.nfev > 500 and debug:
-                print(peak_param.peak_name)
-                print(new_fit.result.init_params)
-                print(new_fit.result.params)
+            if new_fit.result.nfev > 500:
+                logging.debug(peak_param.peak_name)
+                logging.debug(new_fit.result.init_params)
+                logging.debug(new_fit.result.params)
                 new_fit.result.plot_fit(show_init=True, numpoints=500)
                 plt.show()
 
             # Accounting
             self.num_evaluations[peak_param.peak_name] = new_fit.result.nfev
             self.fit_time[peak_param.peak_name] = fit_time
-            
-        if self.verbose:
-            print("Fitting complete.")
 
     def _get_spectrum_subset(self, cakes: Union[int, List[int]],
                              x_range: Union[None, Tuple[float, float]],
@@ -522,15 +518,12 @@ class FitExperiment:
     def __repr__(self):
         return f'<{str(self)}>'
 
-    def run_analysis(self, reuse_fits=False, debug: bool = False):
+    def run_analysis(self, reuse_fits=False):
         """Run a fit over multiple diffraction patterns.
 
         :param reuse_fits: If True, use the result of one time step to provide the initial
           parameters for the next fit. If False, guess the initial fit parameters from the data
           at each time step.
-        :param debug: If True, print a short report each time a fit takes more than 500 time steps.
-          The report gives the initial parameters, the final parameters and a plot of these with
-          the raw data.
         """
         if self.frames_to_load:
             file_list = [self.file_string.format(number) for number in self.frames_to_load]
@@ -543,8 +536,8 @@ class FitExperiment:
 
         print(f"Processing {len(file_list)} diffraction patterns.")
         for file_path in tqdm(file_list):
-            spectral_data = FitSpectrum(file_path, self.first_cake_angle, verbose=False)
-            spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes, debug)
+            spectral_data = FitSpectrum(file_path, self.first_cake_angle)
+            spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes)
             self.time_steps.append(spectral_data)
 
             self._prepare_peak_params(reuse_fits, spectral_data)
@@ -601,10 +594,10 @@ class FitExperiment:
             # Flatten nested list
             maxima_names = [item for sublist in maxima_names for item in sublist]
             if peak_name not in maxima_names:
-                print(f"Peak '{peak_name}' not found in fitted peaks.")
+                logging.warning(f"Peak '{peak_name}' not found in fitted peaks.")
                 return None
         if fit_parameter not in self.fit_parameters(peak_name):
-            print(f"Unknown fit parameter '{fit_parameter}' for peak '{peak_name}'.")
+            logging.warning(f"Unknown fit parameter '{fit_parameter}' for peak '{peak_name}'.")
             return None
 
         # This section translates the user friendly parameter name into the internal lmfit
