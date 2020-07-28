@@ -19,6 +19,7 @@ setup(
                       'tqdm',
                       'lmfit',
                       'notebook',
+                      'ipywidgets'
                       ],
     extras_require={"documentation_compilation": "sphinx"},
     classifiers=[

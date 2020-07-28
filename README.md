@@ -1,11 +1,12 @@
 [![PyPI version](https://badge.fury.io/py/xrdfit.svg)](https://badge.fury.io/py/xrdfit)
 [![Documentation Status](https://readthedocs.org/projects/xrdfit/badge/?version=latest)](https://xrdfit.readthedocs.io/en/latest/?badge=latest)
-[![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007) 
+[![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/LightForm-group/xrdfit/v1.0.0?filepath=%2Ftutorial%20notebooks)
 
 Introduction
 --------------
 
-xrdfit is a Python module for fitting the peaks found in shallow x-ray diffraction spectra. It is designed to be an easy to use tool for quick analysis of spectra. Features are included for automating fitting over many spectra to enable tracking of peaks as they shift through the experiment. xrdfit uses the Python module lmfit for the underlying fitting. xrdfit is designed to be accessible for all researchers who need to process SXRD spectra and so does not require a detailed knowledge of programming or fitting.
+xrdfit is a Python package for fitting the diffraction peaks in synchrotron X-ray diffraction (SXRD) and XRD spectra. It is designed to be an easy to use tool for quick analysis of spectra. Features are included for automating fitting over many spectra to enable tracking of peaks as they shift throughout an experiment. xrdfit uses the Python module lmfit for the underlying fitting. xrdfit is designed to be accessible for all researchers who need to process SXRD spectra and so does not require a detailed knowledge of programming or fitting.
 
 Installation
 -------------
@@ -28,6 +29,18 @@ Documentation including an API reference is provided at: https://xrdfit.readthed
 The majority of the documentation is provided as example driven interactive Jupyter notebooks. These are included along with the source code in the "tutorial notebooks" folder.
 If this package was downloaded from pip, the source can be found on GitHub: https://github.com/LightForm-group/xrdfit
 
+Try it out
+-------------
+
+You can try out `xrdfit` directly in your browser with Binder: https://mybinder.org/v2/gh/LightForm-group/xrdfit/v1.0.0?filepath=%2Ftutorial%20notebooks
+Note that `Tutorial Notebook 4` will not run correctly in Binder as it requires the download of a supplementary dataset (https://zenodo.org/record/3630511#.XjHhJGj7SUl) which is not included in the source repository due to its size.
+
+Compatibility
+--------------
+
+The code was developed and tested with Python version 3.8. The minimum required Python version is 3.6. If you install the dependencies of xrdfit using the 
+specification in requirements.txt, this will use the same package versions used by the developers. While this is good for reproducibility, it is worth noting that
+if you are using a newer Python version > 3.8, some of these packages may not have binary wheels for your version and may require compilation.
 
 Required libraries
 --------------------
