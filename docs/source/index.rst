@@ -41,7 +41,7 @@ Comparison to other peak fitting tools
 DAWN
 -----
 
-DAWN `<https://dawnsci.org/>`_ is a multipurpose framework, developed to deal with analysis of a whole range of
+`DAWN <ttps://dawnsci.org/>`_ is a multipurpose framework, developed to deal with analysis of a whole range of
 datasets measured from beamline experiments. It is the most comparable tool we have come across in terms of its
 ability to do simple fits like those done by `xrdfit`.
 
@@ -60,7 +60,7 @@ necessary. `xrdfit` can also easily deal with large datasets, containing many th
 MAUD
 -----
 
-MAUD `<http://maud.radiographema.eu>`_ can be used to fit peaks in diffraction spectra but uses a Rietveld refinement 
+`MAUD <http://maud.radiographema.eu>`_ can be used to fit peaks in diffraction spectra but uses a Rietveld refinement 
 method to match a model of the beamline setup and material properties to the data. This method is extremely useful for 
 calculating different material properties, such as the crystallographic texture. However, because MAUD uses a model of 
 the unit cell to fit the data, there is some averaging of the overall fit and a larger error in the individual peak 
