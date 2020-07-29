@@ -2,6 +2,7 @@
 [![Documentation Status](https://readthedocs.org/projects/xrdfit/badge/?version=latest)](https://xrdfit.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/LightForm-group/xrdfit/v1.0.0?filepath=%2Ftutorial%20notebooks)
+![.github/workflows/test_notebooks.yaml](https://github.com/LightForm-group/xrdfit/workflows/.github/workflows/test_notebooks.yaml/badge.svg)
 
 Introduction
 --------------
