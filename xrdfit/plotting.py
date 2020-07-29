@@ -34,8 +34,10 @@ def plot_polar_heat_map(num_cakes: int, rad: List[int], z_data: np.ndarray, firs
 
     azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
     r, theta = np.meshgrid(rad, azm)
+    # Offset is anticlockwise regardless of theta direction.
+    # Add 90 to theta offset since theta zero defaults to east.
     plt.subplot(projection="polar", theta_direction=-1,
-                theta_offset=np.deg2rad(half_cake_angle + first_cake_angle))
+                theta_offset=np.deg2rad(half_cake_angle - first_cake_angle + 90))
     plt.pcolormesh(theta, r, z_data.T)
     plt.plot(azm, r, ls='none')
     plt.grid()
@@ -43,14 +45,13 @@ def plot_polar_heat_map(num_cakes: int, rad: List[int], z_data: np.ndarray, firs
     plt.thetagrids([theta * 360 / num_cakes for theta in range(num_cakes)], labels=[])
     # Turn off radial grid lines
     plt.rgrids([])
-    # Put the cake numbers in the right places. The maths for the label angles is really screwy
-    # because setting theta_direction to -1 doesnt seem to affect get_xaxis_text1_transform
-    # which is still trying to rotate the labels anticlockwise. It works anyway.
     ax = plt.gca()
+    # Put the cake numbers in the right places. Rotation is clockwise in accordance with
+    # theta_direction -1 above.
     trans, _, _ = ax.get_xaxis_text1_transform(0)
     for label in range(1, num_cakes + 1):
         ax.text(
-            np.deg2rad((label * degrees_per_cake - half_cake_angle - 90 + 2 * first_cake_angle)),
+            np.deg2rad((label * degrees_per_cake - half_cake_angle)),
             -0.1, label, transform=trans, rotation=0, ha="center", va="center")
     plt.show()
 
