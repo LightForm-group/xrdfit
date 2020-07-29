@@ -1,5 +1,6 @@
 ._.DS_Store
 ._*
+.DS*
 __pycache__/
 .ipynb_checkpoints/
 *.fuse
