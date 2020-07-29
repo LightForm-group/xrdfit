@@ -7,5 +7,3 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
       - uses: treebeardtech/treebeard@master
-        with:
-          notebooks: "tutorial notebooks/1*, tutorial notebooks/2*, tutorial notebooks/3*"
