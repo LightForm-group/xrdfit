@@ -239,7 +239,6 @@ class FitSpectrum:
         self.fit_time = {}
 
         self.spectral_data = pd.read_table(file_path).to_numpy()
-        print("Diffraction pattern successfully loaded from file.")
 
     def __str__(self):
         return f"FitSpectrum with {self.spectral_data.shape[1] - 1} cakes. " \
@@ -376,8 +375,10 @@ class FitSpectrum:
                 logging.debug(peak_param.peak_name)
                 logging.debug(new_fit.result.init_params)
                 logging.debug(new_fit.result.params)
-                new_fit.result.plot_fit(show_init=True, numpoints=500)
-                plt.show()
+                # Check if logging is set to debug before printing plot
+                if logging.getLogger().getEffectiveLevel() <= 10:
+                    new_fit.result.plot_fit(show_init=True, numpoints=500)
+                    plt.show()
 
             # Accounting
             self.num_evaluations[peak_param.peak_name] = new_fit.result.nfev
