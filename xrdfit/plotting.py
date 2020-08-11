@@ -174,7 +174,6 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
         plt.savefig(file_name)
     else:
         plt.show()
-    plt.close()
 
 
 def plot_parameter(data: np.ndarray, fit_parameter: str, show_points: bool,
