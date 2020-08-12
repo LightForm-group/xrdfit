@@ -221,7 +221,7 @@ class FitSpectrum:
     """An object that stores data about a spectrum and its fitted peaks.
 
     :ivar first_cake_angle: The angle of the first cake in the data file in degrees
-      clockwise from North. This angle is always clocwise regardless of the value of `cake_order`.
+      clockwise from North. This angle is always clockwise regardless of the value of `cake_order`.
     :ivar fitted_peaks: Fits to peaks in the spectrum.
     :ivar num_evaluations: A dict of peak names and how many iterations the fit took to converge.
     :ivar fit_time: A dict of peak names and the time taken to evaluate that fit.
@@ -267,7 +267,9 @@ class FitSpectrum:
         with np.errstate(divide='ignore'):
             z_data = np.log10(self.spectral_data[:, 1:])
         rad = self.spectral_data[:, 0]
-        plotting.plot_polar_heat_map(self.num_cakes, rad, z_data, self.first_cake_angle, self.cake_order)
+        rad = np.insert(rad, 0, 0)
+        plotting.plot_polar_heat_map(self.num_cakes, rad, z_data, self.first_cake_angle,
+                                     self.cake_order)
 
     def highlight_cakes(self, cakes: Union[int, List[int]]):
         """Plot a circular map of diffraction pattern with the selected cakes highlighted.
@@ -278,7 +280,8 @@ class FitSpectrum:
         for cake_num in cakes:
             z_data[0, cake_num - 1] = 1
         rad = [0, 1]
-        plotting.plot_polar_heat_map(self.num_cakes, rad, z_data, self.first_cake_angle, self.cake_order)
+        plotting.plot_polar_heat_map(self.num_cakes, rad, z_data, self.first_cake_angle,
+                                     self.cake_order)
 
     def plot(self, cakes_to_plot: Union[int, List[int]], x_range: Tuple[float, float] = None,
              merge_cakes: bool = False, show_points=False, log_scale=False):

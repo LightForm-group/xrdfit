@@ -22,19 +22,21 @@ matplotlib.rc('axes', labelsize=20)
 matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
-def plot_polar_heat_map(num_cakes: int, rad: List[int], z_data: np.ndarray, first_cake_angle: int,
-                        cake_order: str):
+def plot_polar_heat_map(num_cakes: int, rad: Union[np.ndarray, List[int]], z_data: np.ndarray,
+                        first_cake_angle: int, cake_order: str):
     """Plot a polar heat map using matplotlib.
 
     :param num_cakes: The number of segments the polar map is divided into.
     :param rad: The radial bin edges.
     :param z_data: A num_cakes by rad shaped array of data to plot.
-    :param first_cake_angle: The angle clockwise from vertical at which to label the first cake."""
+    :param first_cake_angle: The angle clockwise from vertical at which to label the first cake.
+    :param cake_order: The order of cakes in the input data. Valid options are `clockwise` or
+      `anticlockwise`
+    """
     degrees_per_cake = 360 / num_cakes
     half_cake_angle = degrees_per_cake / 2
 
     azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
-    rad = np.insert(rad, 0, 0)
     r, theta = np.meshgrid(rad, azm)
     # theta_offset is anticlockwise regardless of theta direction.
     # Add 90 to theta offset since theta zero defaults to east.
