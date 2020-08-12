@@ -2,6 +2,7 @@
 [![Documentation Status](https://readthedocs.org/projects/xrdfit/badge/?version=latest)](https://xrdfit.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/203145007.svg)](https://zenodo.org/badge/latestdoi/203145007)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/LightForm-group/xrdfit/v1.0.0?filepath=%2Ftutorial%20notebooks)
+![.github/workflows/test_notebooks.yaml](https://github.com/LightForm-group/xrdfit/workflows/.github/workflows/test_notebooks.yaml/badge.svg)
 
 Introduction
 --------------
@@ -32,27 +33,28 @@ If this package was downloaded from pip, the source can be found on GitHub: http
 Try it out
 -------------
 
-You can try out `xrdfit` directly in your browser with Binder: https://mybinder.org/v2/gh/LightForm-group/xrdfit/v1.0.0?filepath=%2Ftutorial%20notebooks
-Note that `Tutorial Notebook 4` will not run correctly in Binder as it requires the download of a supplementary dataset (https://zenodo.org/record/3630511#.XjHhJGj7SUl) which is not included in the source repository due to its size.
+You can try out `xrdfit` directly in your browser with Binder by clicking [here](https://mybinder.org/v2/gh/LightForm-group/xrdfit/master).
+
+Note that `Tutorial Notebook 4` will not run correctly in Binder as it requires the download of a [supplementary dataset](https://zenodo.org/record/3630511#.XjHhJGj7SUl) which is not included in the source repository due to its size.
 
 Compatibility
 --------------
 
 The code was developed and tested with Python version 3.8. The minimum required Python version is 3.6. If you install the dependencies of xrdfit using the 
 specification in requirements.txt, this will use the same package versions used by the developers. While this is good for reproducibility, it is worth noting that
-if you are using a newer Python version > 3.8, some of these packages may not have binary wheels for your version and may require compilation.
+if you are using a newer Python version (> 3.8), some of these packages may not have binary wheels for your version and may require compilation.
 
 Required libraries
 --------------------
 
 This module uses the Python libraries:
-* NumPy (https://numpy.org/)
-* matplotlib (https://matplotlib.org/)
-* pandas (https://pandas.pydata.org/)
-* dill (https://pypi.org/project/dill/)
-* tqdm (https://tqdm.github.io/)
-* SciPy (https://www.scipy.org/)
-* lmfit (https://lmfit.github.io/lmfit-py/)
+* [NumPy](https://numpy.org/)
+* [matplotlib](https://matplotlib.org/)
+* [pandas](https://pandas.pydata.org/)
+* [dill](https://pypi.org/project/dill/)
+* [tqdm ](https://tqdm.github.io/)
+* [SciPy](https://www.scipy.org/)
+* [lmfit](https://lmfit.github.io/lmfit-py/)
 
 The following libraries are required to use the tutorial documentation workbooks:
-* Jupyter (https://jupyter.org/)
+* [Jupyter](https://jupyter.org/)
