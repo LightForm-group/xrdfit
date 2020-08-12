@@ -26,13 +26,20 @@ The current development version is available on `github
 
 
 Getting started
-================
+==================
 
 This documentation is primarily an API reference, auto-generated from the docstrings in the source code. 
 
-The primary source of documentation for new users is a series of tutorial Jupyter Notebooks which are included with the source code. 
+The primary source of documentation for new users is a series of tutorial Jupyter Notebooks which are included with 
+the source code. You can check out the tutorial notebooks online in your browser at `Binder <https://mybinder.org/v2/gh/LightForm-group/xrdfit/master>`_.
 
-The source and notebooks are available on the project’s GitHub page: `<https://github.com/LightForm-group/xrdfit>`_
+Testing
+========
+
+The code does not contain formal tests but almost all of the features are covered in the tutorial notebooks. If you can run 
+these then you have installed xrdfit successfully!
+
+The source and tutorial notebooks are available on the `xrdfit` `GitHub page <https://github.com/LightForm-group/xrdfit>`_.
 
 
 Comparison to other peak fitting tools
@@ -41,7 +48,7 @@ Comparison to other peak fitting tools
 DAWN
 -----
 
-`DAWN <ttps://dawnsci.org/>`_ is a multipurpose framework, developed to deal with analysis of a whole range of
+`DAWN <https://dawnsci.org/>`_ is a multipurpose framework, developed to deal with analysis of a whole range of
 datasets measured from beamline experiments. It is the most comparable tool we have come across in terms of its
 ability to do simple fits like those done by `xrdfit`.
 
