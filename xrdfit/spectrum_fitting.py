@@ -221,51 +221,64 @@ class FitSpectrum:
     """An object that stores data about a spectrum and its fitted peaks.
 
     :ivar first_cake_angle: The angle of the first cake in the data file in degrees
-      clockwise from North.
+      clockwise from North. This angle is always clocwise regardless of the value of `cake_order`.
     :ivar fitted_peaks: Fits to peaks in the spectrum.
     :ivar num_evaluations: A dict of peak names and how many iterations the fit took to converge.
     :ivar fit_time: A dict of peak names and the time taken to evaluate that fit.
     :ivar spectral_data: Data for the whole diffraction pattern.
+    :ivar cake_order: The order of cakes in the file. Valid options are `clockwise` or
+      `anticlockwise`
     """
-    def __init__(self, file_path: str, first_cake_angle: int = 90):
+    def __init__(self, file_path: str, first_cake_angle: int = 90, delimiter="\t",
+                 cake_order="clockwise"):
         """
         :param file_path: The path of the file containing scattering data to load.
         :param first_cake_angle: The angle of the first cake in the data file in degrees
           clockwise from North.
+        :param delimiter: The delimiter between values in the input file.
         """
+        valid_orders = ["clockwise", "anticlockwise"]
+        if cake_order not in valid_orders:
+            raise SyntaxError(f"Cake order {cake_order} is not valid. Cake order must be one of: "
+                              f"{valid_orders}")
+
         self.first_cake_angle = first_cake_angle
+        self.cake_order = cake_order
         self.fitted_peaks: List[PeakFit] = []
         self.num_evaluations = {}
         self.fit_time = {}
 
-        self.spectral_data = pd.read_table(file_path).to_numpy()
+        self.spectral_data = pd.read_table(file_path, delimiter=delimiter).to_numpy()
 
     def __str__(self):
-        return f"FitSpectrum with {self.spectral_data.shape[1] - 1} cakes. " \
+        return f"FitSpectrum with {self.num_cakes} cakes. " \
                f"Num fitted peaks: {len(self.fitted_peaks)}"
 
     def __repr__(self):
         return f'<{str(self)}>'
+
+    @property
+    def num_cakes(self):
+        """The number of cakes in the spectral data of this FitSpectrum."""
+        return self.spectral_data.shape[1] - 1
 
     def plot_polar(self):
         """Plot the whole diffraction pattern on polar axes."""
         with np.errstate(divide='ignore'):
             z_data = np.log10(self.spectral_data[:, 1:])
         rad = self.spectral_data[:, 0]
-        num_cakes = z_data.shape[1]
-        plotting.plot_polar_heat_map(num_cakes, rad, z_data, self.first_cake_angle)
+        plotting.plot_polar_heat_map(self.num_cakes, rad, z_data, self.first_cake_angle, self.cake_order)
 
     def highlight_cakes(self, cakes: Union[int, List[int]]):
         """Plot a circular map of diffraction pattern with the selected cakes highlighted.
 
         :param cakes: The cake numbers to be highlighted.
         """
-        num_cakes = self.spectral_data.shape[1] - 1
         z_data = np.zeros((1, self.spectral_data.shape[1] - 1))
         for cake_num in cakes:
             z_data[0, cake_num - 1] = 1
         rad = [0, 1]
-        plotting.plot_polar_heat_map(num_cakes, rad, z_data, self.first_cake_angle)
+        plotting.plot_polar_heat_map(self.num_cakes, rad, z_data, self.first_cake_angle, self.cake_order)
 
     def plot(self, cakes_to_plot: Union[int, List[int]], x_range: Tuple[float, float] = None,
              merge_cakes: bool = False, show_points=False, log_scale=False):
