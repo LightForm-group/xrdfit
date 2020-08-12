@@ -33,6 +33,7 @@ def plot_polar_heat_map(num_cakes: int, rad: List[int], z_data: np.ndarray, firs
     half_cake_angle = degrees_per_cake / 2
 
     azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
+    rad = np.insert(rad, 0, 0)
     r, theta = np.meshgrid(rad, azm)
     # Offset is anticlockwise regardless of theta direction.
     # Add 90 to theta offset since theta zero defaults to east.
