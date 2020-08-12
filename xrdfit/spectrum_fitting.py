@@ -227,18 +227,19 @@ class FitSpectrum:
     :ivar fit_time: A dict of peak names and the time taken to evaluate that fit.
     :ivar spectral_data: Data for the whole diffraction pattern.
     """
-    def __init__(self, file_path: str, first_cake_angle: int = 90):
+    def __init__(self, file_path: str, first_cake_angle: int = 90, delimiter="\t"):
         """
         :param file_path: The path of the file containing scattering data to load.
         :param first_cake_angle: The angle of the first cake in the data file in degrees
           clockwise from North.
+        :param delimiter: The delimiter between values in the input file.
         """
         self.first_cake_angle = first_cake_angle
         self.fitted_peaks: List[PeakFit] = []
         self.num_evaluations = {}
         self.fit_time = {}
 
-        self.spectral_data = pd.read_table(file_path).to_numpy()
+        self.spectral_data = pd.read_table(file_path, delimiter=delimiter).to_numpy()
 
     def __str__(self):
         return f"FitSpectrum with {self.spectral_data.shape[1] - 1} cakes. " \
