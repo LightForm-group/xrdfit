@@ -69,7 +69,7 @@ class PeakParams:
         PeakParams."""
         string = f"PeakParams({self.peak_bounds}, {self.get_maxima_names()})"
         if self.maxima[0] != self.peak_bounds:
-            string += f", {[maximum.bounds for maximum in self.maxima]})"
+            string += f", ({[maximum.bounds for maximum in self.maxima]})"
         return string
 
     def __repr__(self):
