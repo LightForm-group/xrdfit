@@ -4,5 +4,5 @@ pandas==1.0.5
 dill==0.3.2
 tqdm==4.47.0
 lmfit==1.0.1
-notebook==6.0.3
+notebook==6.1.5
 ipywidgets==7.5.1
