@@ -1,9 +1,11 @@
 """This module contains the main fitting functions of xrdfit."""
+from __future__ import annotations
 
 import bz2
 import glob
 import time
-from typing import List, Tuple, Union
+from pathlib import Path
+from typing import List, Tuple, Union, Iterable
 import logging
 
 import numpy as np
@@ -229,13 +231,13 @@ class FitSpectrum:
     :ivar cake_order: The order of cakes in the file. Valid options are `clockwise` or
       `anticlockwise`
     """
-    def __init__(self, file_path: str, first_cake_angle: int = 90, delimiter="\t",
-                 cake_order="clockwise"):
+    def __init__(self, data: np.ndarray, first_cake_angle: int = 90, cake_order="clockwise"):
         """
-        :param file_path: The path of the file containing scattering data to load.
-        :param first_cake_angle: The angle of the first cake in the data file in degrees
+        :param data: The spectral data to be analysed.
+        :param first_cake_angle: The angle of the first cake in the data in degrees
           clockwise from North.
-        :param delimiter: The delimiter between values in the input file.
+        :param cake_order: The order of cakes in the data. Valid options are `clockwise` or
+          `anticlockwise`
         """
         valid_orders = ["clockwise", "anticlockwise"]
         if cake_order not in valid_orders:
@@ -247,8 +249,7 @@ class FitSpectrum:
         self.fitted_peaks: List[PeakFit] = []
         self.num_evaluations = {}
         self.fit_time = {}
-
-        self.spectral_data = pd.read_table(file_path, delimiter=delimiter).to_numpy()
+        self.spectral_data = data
 
     def __str__(self):
         return f"FitSpectrum with {self.num_cakes} cakes. " \
@@ -261,6 +262,46 @@ class FitSpectrum:
     def num_cakes(self):
         """The number of cakes in the spectral data of this FitSpectrum."""
         return self.spectral_data.shape[1] - 1
+
+    @classmethod
+    def from_txt(cls, file_path: str, first_cake_angle: int = 90, delimiter="\t",
+                 cake_order="clockwise"):
+        """Load spectral data from a text file.
+
+        :param file_path: The path of the file containing scattering data to load.
+        :param delimiter: The delimiter between values in the input file.
+        :param first_cake_angle: The angle of the first cake in the data file in degrees
+          clockwise from North.
+        :param cake_order: The order of cakes in the file. Valid options are `clockwise` or
+          `anticlockwise`
+        """
+        data = pd.read_table(file_path, delimiter=delimiter).to_numpy()
+        return cls(data, first_cake_angle, cake_order)
+
+    @classmethod
+    def from_binary(cls, file_path: str, first_cake_angle: int = 90, cake_order="clockwise"):
+        """Load spectral data from a numpy binary file.
+
+        :param file_path: The path of the file containing scattering data to load.
+        :param first_cake_angle: The angle of the first cake in the data file in degrees
+          clockwise from North.
+        :param cake_order: The order of cakes in the file. Valid options are `clockwise` or
+          `anticlockwise`
+        """
+        data = np.load(file_path)
+        return cls(data, first_cake_angle, cake_order)
+
+    @classmethod
+    def from_numpy(cls, data: np.ndarray, first_cake_angle: int = 90, cake_order="clockwise"):
+        """Load spectral data from a numpy array.
+
+        :param data: The spectral data to be loaded.
+        :param first_cake_angle: The angle of the first cake in the data file in degrees
+          clockwise from North.
+        :param cake_order: The order of cakes in the file. Valid options are `clockwise` or
+          `anticlockwise`
+        """
+        return cls(data, first_cake_angle, cake_order)
 
     def plot_polar(self):
         """Plot the whole diffraction pattern on polar axes."""
@@ -487,50 +528,68 @@ class FitReport:
                     print(f"{fit_time:2.1f} s: {peak_name}")
 
 
+def load_spectra_from_txt(file_list: List[Union[Path, str]],
+                          delimiter="\t") -> Iterable[np.ndarray]:
+
+    print(f"Processing {len(file_list)} diffraction patterns.")
+
+    for file_path in tqdm(file_list):
+        data = pd.read_table(file_path, delimiter=delimiter).to_numpy()
+        yield data
+
+
+def load_spectra_from_binary(file_list: List[Union[Path, str]]) -> Iterable[np.ndarray]:
+
+    print(f"Processing {len(file_list)} diffraction patterns.")
+
+    for file_path in file_list:
+        data = np.load(str(file_path))
+        yield data
+
+
+def glob_files(file_string) -> List[Path]:
+    file_list = sorted(glob.glob(file_string))
+    if len(file_list) == 0:
+        raise FileNotFoundError(f"No files found with file stub: '{file_string}'")
+    return file_list
+
+
 class FitExperiment:
     """Information about a series of fits to temporally spaced diffraction patterns.
 
+    :ivar data: A time series of spectral data to fit.
     :ivar spectrum_time: Time between subsequent diffraction patterns.
-    :ivar file_string: String used to glob for the diffraction patterns.
-    :ivar first_cake_angle: The angle of the first cake in the data file in degrees
-      clockwise from North.
     :ivar cakes_to_fit: Which of the cakes in the diffraction pattern to fit.
     :ivar peak_params: The provided :class:`PeakParams` to use for fitting.
     :ivar merge_cakes: If multiple cakes are requested, whether to merge them or fit them \
       separately.
-    :ivar frames_to_load: If specified, which time steps to fit.
     :ivar time_steps: A list of :class:`FitSpectrum` one for each time step.
     :ivar fit_report: A :class:`FitReport` for this :class`FittingExperiment`.
     """
-    def __init__(self, spectrum_time: float, file_string: str, first_cake_angle: int,
-                 cakes_to_fit: List[int], peak_params: Union[PeakParams, List[PeakParams]],
-                 merge_cakes: bool, frames_to_load: List[int] = None):
+    def __init__(self, data: Iterable[np.ndarray], cakes_to_fit: Union[int, List[int]],
+                 peak_params: Union[PeakParams, List[PeakParams]],
+                 merge_cakes: bool, **kwargs):
         """
-        :param spectrum_time: Time between subsequent diffraction patterns.
-        :param file_string: String used to glob for the diffraction patterns.
-        :param first_cake_angle: The angle of the first cake in the data file in degrees \
-          clockwise from North.
+        :param data: A time series of spectral data to fit.
         :param cakes_to_fit: Which of the cakes in the diffraction pattern to fit.
         :param peak_params: The provided :class:`PeakParams` to use for fitting.
         :param merge_cakes: If multiple cakes are requested, whether to merge them or fit them \
           separately.
-        :param frames_to_load: If specified, which time steps to fit.
+        :param kwargs: Any arguments to pass to FitSpectrum
         """
-        self.spectrum_time = spectrum_time
-        self.file_string = file_string
-        self.first_cake_angle = first_cake_angle
+        self.data = data
         self.cakes_to_fit = cakes_to_fit
         if isinstance(peak_params, PeakParams):
             peak_params = [peak_params]
         self.peak_params = peak_params
         self.merge_cakes = merge_cakes
-        self.frames_to_load = frames_to_load
+        self.kwargs = kwargs
 
         self.time_steps: List[FitSpectrum] = []
         self.fit_report = FitReport([peak.peak_name for peak in peak_params])
 
     def __str__(self):
-        return f'FitExperiment with {len(self.time_steps)} time steps.'
+        return f'FitExperiment with {len(self.time_steps)} fitted time steps.'
 
     def __repr__(self):
         return f'<{str(self)}>'
@@ -542,25 +601,19 @@ class FitExperiment:
           parameters for the next fit. If False, guess the initial fit parameters from the data
           at each time step.
         """
-        if self.frames_to_load:
-            file_list = [self.file_string.format(number) for number in self.frames_to_load]
-        else:
-            file_list = sorted(glob.glob(self.file_string))
-            if len(file_list) == 0:
-                raise FileNotFoundError(f"No files found with file stub: '{self.file_string}'")
+        num_timesteps = 0
 
-        self.fit_report.num_time_steps = len(file_list)
-
-        print(f"Processing {len(file_list)} diffraction patterns.")
-        for file_path in tqdm(file_list):
-            spectral_data = FitSpectrum(file_path, self.first_cake_angle)
+        for frame in self.data:
+            spectral_data = FitSpectrum.from_numpy(frame, **self.kwargs)
             spectral_data.fit_peaks(self.peak_params, self.cakes_to_fit, self.merge_cakes)
             self.time_steps.append(spectral_data)
 
             self._prepare_peak_params(reuse_fits, spectral_data)
             self._update_fit_report(spectral_data)
-
+            num_timesteps += 1
         print("Analysis complete.")
+
+        self.fit_report.num_time_steps = num_timesteps
         self.fit_report.print()
 
     def _prepare_peak_params(self, reuse_fits, spectral_data):
@@ -595,7 +648,8 @@ class FitExperiment:
                     fit_parameters.append(name)
         return fit_parameters
 
-    def get_fit_parameter(self, peak_name: str, fit_parameter: str) -> Union[None, np.ndarray]:
+    def get_fit_parameter(self, peak_name: str,
+                          fit_parameter: str) -> Union[None, Tuple[list, list]]:
         """Get the raw values and error of a fitting parameter over time.
 
         :param peak_name: The name of the peak to get the data for.
@@ -629,32 +683,38 @@ class FitExperiment:
         for time_step in self.time_steps:
             peak_fit = time_step.get_fit(peak_name)
             parameters.append(peak_fit.result.params[fit_parameter])
-        if self.frames_to_load:
-            x_data = np.array(self.frames_to_load) * self.spectrum_time
-        else:
-            x_data = (np.arange(len(parameters)) + 1) * self.spectrum_time
         # It is possible that leastsq can't invert the curvature matrix so cant provide error
         # estimates. In these cases stderr is given as None.
         errors = [parameter.stderr if parameter.stderr else 0 for parameter in parameters]
         values = [parameter.value for parameter in parameters]
-        data = np.vstack((x_data, values, errors)).T
-        return data
 
-    def plot_fit_parameter(self, peak_name: str, fit_parameter: str, show_points=False,
+        return values, errors
+
+    def plot_fit_parameter(self, peak_name: str, fit_parameter: str,
+                           x_step: Union[float, List[float]] = 1, show_points=False,
                            show_error=True, scale_by_error: bool = False, log_scale=False):
         """Plot a named parameter of a fit as a function of time.
-
         :param peak_name: The name of the fit to plot.
         :param fit_parameter: The name of the fit parameter to plot.
+        :param x_step: The time interval of the spectra, used to label the x-axis.
         :param show_points: Whether to show data points on the plot.
         :param show_error: Whether to show the y-error as a shaded area on the plot.
         :param scale_by_error: If False the y-axis will be scaled to fit the data values. If True
           the y-axis will be scaled to fit the error values.
         :param log_scale: Whether to plot the y-axis on a log or linear scale.
         """
-        data = self.get_fit_parameter(peak_name, fit_parameter)
-        if data is not None:
-            plotting.plot_parameter(data, fit_parameter, show_points, show_error,
+        y_data, y_error = self.get_fit_parameter(peak_name, fit_parameter)
+
+        # If x is provided as a time spacing then generate a list of frame times.
+        if isinstance(x_step, float) or isinstance(x_step, int):
+            x_data = np.arange(0, len(y_data) * x_step, step=x_step)
+        else:
+            x_data = x_step
+        if len(x_data) != len(y_data):
+            raise ValueError("Length of x_data is not the same as length of y_data.")
+
+        if y_data is not None:
+            plotting.plot_parameter(x_data, y_data, y_error, fit_parameter, show_points, show_error,
                                     scale_by_error, log_scale)
 
     def plot_fits(self, num_time_steps: int = 5, peak_names: Union[List[str], str] = None,

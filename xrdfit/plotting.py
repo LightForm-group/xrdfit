@@ -187,12 +187,13 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
         plt.show()
 
 
-def plot_parameter(data: np.ndarray, fit_parameter: str, show_points: bool,
-                   show_error: bool, scale_by_error: bool = False, log_scale=False):
+def plot_parameter(x_data: List[float], y_data: List[float], y_error: List[float],
+                   fit_parameter: str, show_points: bool, show_error: bool,
+                   scale_by_error: bool = False, log_scale=False):
     """Plot a parameter of a fit against time.
-
-    :param data: The data to plot, x data in the first column, y data in the second column and
-      the y error in the third column.
+    :param x_data: The x data to plot.
+    :param y_data: The y data to plot.
+    :param y_error: The y error bars.
     :param fit_parameter: The name of the parameter being plotted, used to generate the y-axis label
     :param show_points: Whether to show data points on the plot.
     :param show_error: Whether to show error bars on the plot.
@@ -200,20 +201,26 @@ def plot_parameter(data: np.ndarray, fit_parameter: str, show_points: bool,
       auto scale the y-axis to the range of the data.
     :param log_scale: Whether to plot the y-axis on a log or linear scale.
     """
-    no_covar_mask = data[:, 2] == 0
+    x_data = np.array(x_data)
+    y_data = np.array(y_data)
+    y_error = np.array(y_error)
+
+    # Sometimes the error can't be computed. We filter these points to give them a different
+    # marker.
+    no_covar_mask = y_error == 0
     covar_mask = [not value for value in no_covar_mask]
     # Plotting the data
-    plt.plot(data[:, 0], data[:, 1], "-", mec="red")
+    plt.plot(x_data, y_data, "-", mec="red")
     # Save the y-range to reapply later if wanted
     data_y_range = plt.ylim()
     if show_points:
-        plt.plot(data[covar_mask, 0], data[covar_mask, 1], "x", mec="blue")
-        plt.plot(data[no_covar_mask, 0], data[no_covar_mask, 1], "^", mec="blue")
+        plt.plot(x_data[covar_mask], y_data[covar_mask], "x", mec="blue")
+        plt.plot(x_data[no_covar_mask], y_data[no_covar_mask], "^", mec="blue")
     # Plotting the error bars
     if show_error:
-        plt.fill_between(data[:, 0], data[:, 1] - data[:, 2], data[:, 1] + data[:, 2], alpha=0.3)
-        plt.plot(data[:, 0], data[:, 1] - data[:, 2], "--", lw=0.5, color='gray')
-        plt.plot(data[:, 0], data[:, 1] + data[:, 2], "--", lw=0.5, color='gray')
+        plt.fill_between(x_data, y_data - y_error, y_data + y_error, alpha=0.3)
+        plt.plot(x_data, y_data - y_error, "--", lw=0.5, color='gray')
+        plt.plot(x_data, y_data + y_error, "--", lw=0.5, color='gray')
 
     if not scale_by_error:
         plt.ylim(data_y_range)

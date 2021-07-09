@@ -3,6 +3,7 @@ None of these functions should be called directly by users - these functions are
 methods in spectrum_fitting.
 """
 
+from __future__ import annotations
 from typing import List, Tuple, TYPE_CHECKING
 
 import lmfit
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from spectrum_fitting import PeakParams, MaximumParams
 
 
-def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.ModelResult:
+def do_pv_fit(peak_data: np.ndarray, peak_param: PeakParams) -> lmfit.model.ModelResult:
     """Pseudo-Voigt fit to the lattice plane peak intensity.
 
     :param peak_data: The data to be fitted, two theta values (x-data) in column 0 and intensity
@@ -50,7 +51,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
 
 def guess_params(model: lmfit.Model, old_fit_params: lmfit.Parameters,
                  x_data: np.ndarray, y_data: np.ndarray,
-                 maxima_params: List["MaximumParams"]) -> lmfit.Parameters:
+                 maxima_params: List[MaximumParams]) -> lmfit.Parameters:
     """Given a dataset and some information about where the maxima are, guess some good initial
     values for the Pseudo-Voigt fit.
 
