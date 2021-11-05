@@ -7,13 +7,14 @@ import os
 import pathlib
 from typing import Tuple, List, Union, TYPE_CHECKING
 
+import lmfit
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
 # TYPE_CHECKING is False at runtime but allows Type hints in IDE
 if TYPE_CHECKING:
-    from xrdfit.spectrum_fitting import PeakParams, PeakFit
+    from xrdfit.spectrum_fitting import PeakParams
 
 matplotlib.rc('xtick', labelsize=14)
 matplotlib.rc('ytick', labelsize=14)
@@ -22,33 +23,12 @@ matplotlib.rc('axes', labelsize=20)
 matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 
-def plot_polar_heat_map(num_cakes: int, rad: Union[np.ndarray, List[int]], z_data: np.ndarray,
-                        first_cake_angle: int, cake_order: str):
-    """Plot a polar heat map using matplotlib.
-
-    :param num_cakes: The number of segments the polar map is divided into.
-    :param rad: The radial bin edges.
-    :param z_data: A num_cakes by rad shaped array of data to plot.
-    :param first_cake_angle: The angle clockwise from vertical at which to label the first cake.
-    :param cake_order: The order of cakes in the input data. Valid options are `clockwise` or
-      `anticlockwise`
-    """
-    degrees_per_cake = 360 / num_cakes
-    half_cake_angle = degrees_per_cake / 2
-
+def plot_polar_heatmap(num_cakes: int, rad: List[int], z_data: np.ndarray, first_cake_angle: int):
+    """A method for plotting a polar heatmap."""
     azm = np.linspace(0, 2 * np.pi, num_cakes + 1)
     r, theta = np.meshgrid(rad, azm)
-    # theta_offset is anticlockwise regardless of theta direction.
-    # Add 90 to theta offset since theta zero defaults to east.
-    # Subtract first cake angle to orient image correctly
-    # Subtract half of direction * half cake angle to align cake centers in cardinal directions,
-    # rather than the bin edges.
-    if cake_order == "clockwise":
-        direction = -1
-    else:
-        direction = 1
-    plt.subplot(projection="polar", theta_direction=direction,
-                theta_offset=np.deg2rad(90 - first_cake_angle - (direction * half_cake_angle)))
+    plt.subplot(projection="polar", theta_direction=-1,
+                theta_offset=np.deg2rad(360 / num_cakes / 2))
     plt.pcolormesh(theta, r, z_data.T)
     plt.plot(azm, r, ls='none')
     plt.grid()
@@ -56,30 +36,20 @@ def plot_polar_heat_map(num_cakes: int, rad: Union[np.ndarray, List[int]], z_dat
     plt.thetagrids([theta * 360 / num_cakes for theta in range(num_cakes)], labels=[])
     # Turn off radial grid lines
     plt.rgrids([])
+    # Put the cake numbers in the right places
     ax = plt.gca()
-    # Put the cake numbers in the right places. Rotation is clockwise in accordance with
-    # theta_direction -1 above.
     trans, _, _ = ax.get_xaxis_text1_transform(0)
+    degrees_per_cake = 360/num_cakes
+    half_cake = degrees_per_cake / 2
     for label in range(1, num_cakes + 1):
-        ax.text(
-            np.deg2rad((label * degrees_per_cake - half_cake_angle)),
-            -0.1, label, transform=trans, rotation=0, ha="center", va="center")
+        ax.text(np.deg2rad(label * degrees_per_cake - 90 - half_cake + first_cake_angle), -0.1,
+                label, transform=trans, rotation=0, ha="center", va="center")
     plt.show()
 
 
 def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool, show_points: bool,
                   x_range: Union[None, Tuple[float, float]] = None, log_scale=False):
-    """Plot a raw spectrum using matplotlib.
-
-    :param data: The data to plot, x_data in column 0, y data in columns 1-N where N is the number
-      of cakes in the dataset.
-    :param cakes_to_plot: Which cakes (columns of y data) to plot.
-    :param merge_cakes: If True plot the sum of the selected cakes as a single line. If False plot
-      all selected cakes individually.
-    :param show_points: Whether to show data points on the plot.
-    :param x_range: If supplied, restricts the x-axis of the plot to this range.
-    :param log_scale: If True, plot y axis on log scale. If False use linear scale.
-    """
+    """Plot a raw spectrum."""
     if show_points:
         line_spec = "-x"
     else:
@@ -101,24 +71,18 @@ def plot_spectrum(data: np.ndarray, cakes_to_plot: List[int], merge_cakes: bool,
     plt.minorticks_on()
     plt.xlabel(r'Two Theta ($^\circ$)')
     plt.ylabel('Intensity')
-    if x_range:
-        plt.xlim(x_range[0], x_range[1])
     if log_scale:
         plt.yscale("log")
+    else: 
+        plt.yscale("linear")
+    if x_range:
+        plt.xlim(x_range[0], x_range[1])
     plt.tight_layout()
 
 
-def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, float],
-                     label_angle: float):
-    """A visualisation to show the PeakParams. Peak bounds are indicated by a shaded grey area.
-    Maxima bounds are shown by a dashed green line for the min bound and a dashed red line for
-    the max bound. This method is called with an active plot environment and plots the peak
-    params on top.
-
-    :param peak_params: The peak params to plot.
-    :param x_range: If supplied, restricts the x-axis of the plot to this range.
-    :param label_angle: If supplied, the angle to rotate the maxima labels.
-    """
+def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, float]):
+    """Plot a dashed line at the maximum and minimum extent of the provided PeakParams and shade
+    the contained area."""
     for params in peak_params:
         bounds_min = params.peak_bounds[0]
         bounds_max = params.peak_bounds[1]
@@ -126,57 +90,50 @@ def plot_peak_params(peak_params: List["PeakParams"], x_range: Tuple[float, floa
         plt.axvline(bounds_min, ls="-", lw=1, color="grey")
         plt.axvline(bounds_max, ls="-", lw=1, color="grey")
         plt.axvspan(bounds_min, bounds_max, alpha=0.2, color='grey', hatch="/")
-        for maximum in params.maxima:
-            min_x = maximum.bounds[0]
-            max_x = maximum.bounds[1]
-            center = (min_x + max_x) / 2
+        for param in params.maxima_bounds:
+            min_x = param[0]
+            max_x = param[1]
             plt.axvline(min_x, ls="--", color="green")
             plt.axvline(max_x, ls="--", color="red")
-            if x_range[0] < range_center < x_range[1]:
-                plt.text(center, plt.ylim()[1], maximum.name, ha="center", va="bottom",
-                         fontsize=matplotlib.rcParams["axes.titlesize"] * 0.8, rotation=label_angle)
+        bottom, top = plt.ylim()
+        if x_range[0] < range_center < x_range[1]:
+            plt.text(range_center, top, params.name, size=20, ha="center", va="bottom")
         plt.xlim(x_range)
+        plt.yscale("log")
 
 
-def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = None,
-                  title: str = None, label_angle: float = None, log_scale=False):
+def plot_peak_fit(data: np.ndarray, cake_numbers: List[int], fit_result: lmfit.model.ModelResult,
+                  fit_name: str, timestep: str = None, file_name: str = None, log_scale=False, plot_components=False):
     """Plot the result of a peak fit as well as the raw data.
-
-    :param peak_fit: The result of a peak fit
-    :param time_step: If provided, used to generate the title of the plot.
-    :param file_name: If provided used as a on disk location to save the plot.
-    :param title: If provided, can be used to override the auto generated plot title.
-    :param label_angle: The angle to rotate maxima labels.
-    :param log_scale: Whether to plot the y axis on a log or linear scale.
+    
+    plot_comps: plots the compontents of each fit
     """
-    data = peak_fit.raw_spectrum
-    # First plot the raw data
-    for index, cake_num in enumerate(peak_fit.cake_numbers):
-        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label=f"Cake {cake_num}")
 
-    title_size = matplotlib.rcParams["axes.titlesize"]
+    # First plot the raw data
+    for index, cake_num in enumerate(cake_numbers):
+        plt.plot(data[:, 0], data[:, index + 1], 'x', ms=10, mew=3, label=f"Cake {cake_num}")
 
     # Now plot the fit
     x_data = np.linspace(np.min(data[:, 0]), np.max(data[:, 0]), 100)
-    y_fit = peak_fit.result.model.eval(peak_fit.result.params, x=x_data)
+    y_fit = fit_result.model.eval(fit_result.params, x=x_data)
+    comps = fit_result.eval_components(x=x_data)
+
     plt.plot(x_data, y_fit, 'k--', lw=1, label="Fit")
-    # Do all the ancillaries to make the plot look good.
+    
+    if plot_components:
+        for key, fit in list(comps.items())[:-1]:
+            plt.plot(x_data, fit, "--", label="key")
+        
     plt.minorticks_on()
     plt.tight_layout()
     plt.xlabel(r'Two Theta ($^\circ$)')
     plt.ylabel('Intensity')
     plt.legend()
-    if title is not None:
-        plt.title(title, va="bottom", fontsize=title_size, pad=title_size * 1.8)
-    elif time_step is not None:
-        plt.title(f'Fit at t = {time_step}', va="bottom", fontsize=title_size, pad=title_size * 1.8)
-
-    for index, maxima_name in enumerate(peak_fit.maxima_names):
-        maxima_center = peak_fit.result.params[f"maximum_{index}_center"]
-        plt.text(maxima_center, plt.ylim()[1] * 1.05, maxima_name, horizontalalignment="center",
-                 fontsize=title_size * 0.8, rotation=label_angle)
+    if timestep:
+        fit_name = f'Peak "{fit_name}" at t = {timestep}'
     if log_scale:
         plt.yscale("log")
+    plt.title(fit_name)
     plt.tight_layout()
     if file_name:
         file_name = pathlib.Path(file_name)
@@ -185,27 +142,21 @@ def plot_peak_fit(peak_fit: "PeakFit", time_step: str = None, file_name: str = N
         plt.savefig(file_name)
     else:
         plt.show()
+    plt.close()
 
 
-def plot_parameter(data: np.ndarray, fit_parameter: str, show_points: bool,
-                   show_error: bool, scale_by_error: bool = False, log_scale=False):
+def plot_parameter(data: np.ndarray, fit_parameter: str, peak_name: str, show_points: bool,
+                   show_error: bool, y_range: Union[None, Tuple[float, float]]):
     """Plot a parameter of a fit against time.
-
-    :param data: The data to plot, x data in the first column, y data in the second column and
-      the y error in the third column.
-    :param fit_parameter: The name of the parameter being plotted, used to generate the y-axis label
-    :param show_points: Whether to show data points on the plot.
-    :param show_error: Whether to show error bars on the plot.
-    :param scale_by_error: If True auto scale the y-axis to the range of the error bars. If False,
-      auto scale the y-axis to the range of the data.
-    :param log_scale: Whether to plot the y-axis on a log or linear scale.
+    The data array contains x data in the first column, y data in the second column and the y
+    error in the third column.
     """
     no_covar_mask = data[:, 2] == 0
     covar_mask = [not value for value in no_covar_mask]
     # Plotting the data
     plt.plot(data[:, 0], data[:, 1], "-", mec="red")
-    # Save the y-range to reapply later if wanted
-    data_y_range = plt.ylim()
+    # Save the y-range to reapply later because the error bars can make it go crazy
+    current_y_range = plt.ylim()
     if show_points:
         plt.plot(data[covar_mask, 0], data[covar_mask, 1], "x", mec="blue")
         plt.plot(data[no_covar_mask, 0], data[no_covar_mask, 1], "^", mec="blue")
@@ -215,11 +166,12 @@ def plot_parameter(data: np.ndarray, fit_parameter: str, show_points: bool,
         plt.plot(data[:, 0], data[:, 1] - data[:, 2], "--", lw=0.5, color='gray')
         plt.plot(data[:, 0], data[:, 1] + data[:, 2], "--", lw=0.5, color='gray')
 
-    if not scale_by_error:
-        plt.ylim(data_y_range)
-    if log_scale:
-        plt.yscale("log")
+    if y_range:
+        plt.ylim(y_range)
+    else:
+        plt.ylim(current_y_range)
 
     plt.xlabel("Time (s)")
-    plt.ylabel(fit_parameter.replace('_', ' ').title())
+    plt.ylabel(fit_parameter.replace("_", " ").title())
+    plt.title("Peak {}".format(peak_name))
     plt.show()
