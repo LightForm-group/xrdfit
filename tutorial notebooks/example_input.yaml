@@ -1,0 +1,16 @@
+peak_params:
+    peak1:
+        peak_bounds: 2.75, 2.95
+        maxima_names: '1'
+    peak2:
+        peak_bounds: 3.02, 3.32
+        maxima_names: ['2', '3', '4']
+        maxima_bounds: ['3.09, 3.12', '3.19, 3.22', '3.24, 3.26']
+    peak3:
+        peak_bounds: 4.13, 4.30
+        maxima_names: '5'
+
+first_cake_angle: 90
+frame_time: 0.1
+max_frame: 100
+merge_cakes: False

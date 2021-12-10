@@ -1,7 +1,9 @@
 """This module contains the main fitting functions of xrdfit."""
 
+from __future__ import annotations
 import bz2
 import glob
+import re
 import time
 from typing import List, Tuple, Union
 import logging
@@ -77,6 +79,35 @@ class PeakParams:
         if self.maxima[0] != self.peak_bounds:
             string += f", maxima bounds: {[maximum.bounds for maximum in self.maxima]})"
         return string
+
+    @classmethod
+    def from_dict(cls, params: dict, name: str) -> PeakParams:
+        """Generate PeakParams objects from a specification provided as a dictionary. This
+        allows reading in PeakParams from YAML files."""
+
+        valid_keys = ["peak_bounds", "maxima_names", "maxima_bounds"]
+
+        if "peak_bounds" not in params:
+            raise SyntaxError(f"'peak_bounds' key not specified for peak: '{name}' in input "
+                              f"parameters.")
+        if "maxima_names" not in params:
+            raise SyntaxError(f"'maxima_names' key not specified for peak: '{name}' in input "
+                              f"parameters.")
+        for key in params.keys():
+            if key not in valid_keys:
+                raise SyntaxError("Error in PeakParams specifications for peak: '{name}'. "
+                                  f"Invalid key: '{key}'. Valid keys are: "
+                                  f"{' '.join(valid_keys)}")
+        # Split on any non-string character apart from period.
+        peak_bounds = re.split(r"[^a-zA-Z0-9_.]+", params["peak_bounds"])
+        peak_bounds = tuple([float(i) for i in peak_bounds])
+
+        if "maxima_bounds" in params:
+            maxima_bounds = [re.split(r"[^a-zA-Z0-9_.]+", pair) for pair in params["maxima_bounds"]]
+            maxima_bounds = [tuple([float(i) for i in pair]) for pair in maxima_bounds]
+            return PeakParams(peak_bounds, params["maxima_names"], maxima_bounds)
+        else:
+            return PeakParams(peak_bounds, params["maxima_names"])
 
     def get_maxima_names(self) -> List[str]:
         return [maximum.name for maximum in self.maxima]
@@ -689,7 +720,7 @@ class FitExperiment:
     def _calculate_time_steps(self, num_time_steps: int) -> List[int]:
         """Work out which time_steps to plot.
 
-        :param num_time_steps: The total number of timesteps to plot.
+        :param num_time_steps: The total number of time steps to plot.
         """
         time_steps = np.linspace(0, len(self.time_steps) - 1, num_time_steps)
         # Remove duplicate values
@@ -744,3 +775,8 @@ def load_dump(file_name: str) -> FitExperiment:
         data = dill.load(input_file)
         print("Data successfully loaded from dump file.")
         return data
+
+
+def peak_params_from_dict(peak_params: dict) -> List[PeakParams]:
+    """Given a dictionary specifying Peak parameters, return a list of PeakParams objects."""
+    return [PeakParams.from_dict(param, name) for name, param in peak_params.items()]
