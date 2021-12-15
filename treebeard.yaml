@@ -1,5 +1,0 @@
-# example treebeard.yaml
-notebooks:
-  - tutorial notebooks/*.ipynb
-ignore:
-  - tutorial notebooks/4 - Working with larger data sets.ipynb
