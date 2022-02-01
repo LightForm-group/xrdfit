@@ -279,7 +279,7 @@ class FitSpectrum:
         self.num_evaluations = {}
         self.fit_time = {}
 
-        self.spectral_data = pd.read_table(file_path, delimiter=delimiter).to_numpy()
+        self.spectral_data = pd.read_table(file_path, delimiter=delimiter, header=None).to_numpy()
 
     def __str__(self):
         return f"FitSpectrum with {self.num_cakes} cakes. " \
