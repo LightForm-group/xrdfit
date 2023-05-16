@@ -7,7 +7,7 @@ xrdfit documentation
 Installation
 ==============
 
-``xrdfit`` is compatible with Python 3.6+.
+``xrdfit`` is compatible with Python 3.7+.
 
 Use :command:`pip` to install the latest stable version of ``xrdfit``:
 

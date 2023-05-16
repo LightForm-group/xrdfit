@@ -40,9 +40,7 @@ Note that `Tutorial Notebook 4` will not run correctly in Binder as it requires 
 Compatibility
 --------------
 
-The code was developed and tested with Python version 3.8. The minimum required Python version is 3.6. If you install the dependencies of xrdfit using the 
-specification in requirements.txt, this will use the same package versions used by the developers. While this is good for reproducibility, it is worth noting that
-if you are using a newer Python version (> 3.8), some of these packages may not have binary wheels for your version and may require compilation.
+The latest version of xrdfit was tested with Python version 3.10. The minimum required Python version is 3.7.
 
 Required libraries
 --------------------
