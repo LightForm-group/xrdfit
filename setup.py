@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='xrdfit',
-    version='1.2.1',
+    version='1.3.0',
     description='Automated fitting of XRD peaks using Pseudo-Voight fits',
     author='Peter Crowther, Christopher Daniel',
     long_description=long_description,
@@ -27,5 +27,5 @@ setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
 )

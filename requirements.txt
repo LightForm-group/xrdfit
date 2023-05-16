@@ -3,7 +3,7 @@ matplotlib
 pandas
 dill
 tqdm
-lmfit
+lmfit>=1.1.0
 notebook
 ipywidgets
 PyYAML

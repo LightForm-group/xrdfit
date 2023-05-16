@@ -29,7 +29,7 @@ def do_pv_fit(peak_data: np.ndarray, peak_param: "PeakParams") -> lmfit.model.Mo
             model += lmfit.models.PseudoVoigtModel(prefix=prefix)
         else:
             model = lmfit.models.PseudoVoigtModel(prefix=prefix)
-    model += lmfit.Model(lambda background: background)
+    model += lmfit.Model(lambda x, background: background)
 
     two_theta = peak_data[:, 0]
     intensity = peak_data[:, 1]
